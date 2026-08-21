@@ -4,3 +4,4 @@
 
 | rec_id | network | status | campaign | ad set id | verdict | created |
 |---|---|---|---|---|---|---|
+| rec-2026-08-21-women-1822-casual-lpv | snap | proposed | RA_TRAFFIC_GET_IN_PAN_TOF_202608 |  |  | 2026-08-21 |
