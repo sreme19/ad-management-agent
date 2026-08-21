@@ -1,39 +1,68 @@
 # ad-management-agent
 
-A loop-engineered, harness-driven ad-operations agent for Riteangle (the product; the consumer-facing
-codebase is `pocket-dating-coach`). It runs entirely inside Claude Code sessions — **no Anthropic API
-key exists anywhere in this repo.** The actual reasoning (targeting, creative, research) happens live
-in whichever Claude Code session is running one of the four modes below; this repo's own code only
-persists results deterministically, through a small zero-API command-line tool.
+**A private system that runs ad operations for Riteangle** (the product; the codebase and internal
+identifiers say `verified_vibe_*`, and the consumer-facing site is `pocket-dating-coach`). It is not a
+bot that touches Ads Manager — it recommends what to set up, researches what's actually working, digs
+up what to try next, and learns from ads found elsewhere, so every campaign traces back to a reasoned
+decision instead of ad hoc guesswork.
 
-Built in the same spirit as this account's other agent, [job-hunt-agent](https://github.com/sreme19/job-hunt-agent) — same philosophy (do the
-thinking live, in a paid-for chat session; only give a CLI to the parts that are pure, deterministic
-file reads and writes), applied to running paid social campaigns instead of a job search.
+Everything here is written for someone who does **not** need to read code to understand it. If you're
+picturing a small in-house ad-ops team (a planner, an auditor, a researcher, and a scout) working off
+one shared filing cabinet, you already understand the shape of it.
 
-## Start here
+## The big picture
 
-- **[Architecture and Decisions](Architecture-and-Decisions)** — why this repo is shaped the way it
-  is, and every locked design decision behind it.
-- **[The Four Modes](The-Four-Modes)** — what each skill does and when to invoke it.
-- **[Rules Overview](Rules-Overview)** — where the targeting, creative, compliance, naming, and budget
-  rules actually live, and how they're meant to be used.
-- **[Ledger and CLI](Ledger-and-CLI)** — the `ad-agent` command reference and the campaign-record
-  lifecycle.
-- **[Data Access](Data-Access)** — how this agent reads `pocket-dating-coach`'s analytics, and what's
-  not wired up yet.
-- **[Working Across Laptop, Sandbox, and GitHub](Working-Across-Laptop-Sandbox-and-GitHub)** — how
-  this repo stays in sync across the three places it lives.
-- **[Open Work](Open-Work)** — what's still outstanding, and where.
+```mermaid
+flowchart LR
+    subgraph Ideate["Finding what to try next"]
+        I1["Competitor + product-story research\n(ad-ideation)"]
+        I2["Learn from an ad found elsewhere\n(ad-intake)"]
+    end
 
-## The one sentence version
+    subgraph Setup["Recommending a new ad"]
+        S1["Names, targeting, creative, budget\n(ad-setup-loop)"]
+        S2(["You set it up by hand\nin Ads Manager"])
+    end
 
-You ask a Claude Code session rooted in this repo to set up an ad, audit how the live ads are doing,
-find new ideas, or learn from an ad you found somewhere else; the session does the actual thinking and
-writes the result to a plain-text ledger that never touches a live Ads Manager account.
+    subgraph Track["The filing cabinet"]
+        L1["One record per recommendation,\nproposed through reviewed"]
+    end
 
-## The one rule that never changes
+    subgraph Audit["Checking what's real"]
+        A1["Pull real performance data,\njoin it back to the record\n(ad-audit)"]
+        A2{"working / not-working /\ninconclusive?"}
+    end
 
-This agent never calls a Meta or Snap Ads Manager API to create, publish, enable, or change budget on
-anything live. Every recommendation it produces is instructions a human executes by hand. That stays
-true even if a future Claude plugin exists to "steer" the setup process — steering means telling the
-human what to click, never clicking it.
+    I1 -->|"recommend"| S1
+    I2 -->|"recommend"| S1
+    S1 --> L1
+    L1 --> S2
+    S2 -->|"log the real IDs"| L1
+    L1 --> A1 --> A2
+    A2 -.->|"feeds the next round"| I1
+```
+
+Nothing in this loop ever touches a live Meta or Snap account. The only step that reaches the outside
+world &mdash; creating or changing anything in Ads Manager &mdash; is done by a person, every single
+time.
+
+## Read next
+
+- **[How the four modes work](How-the-four-modes-work)** &mdash; the loop, step by step, in plain
+  language
+- **[The ledger](The-ledger)** &mdash; what "the ledger" actually is, and the lifecycle every
+  recommendation moves through
+- **[The rules](The-rules)** &mdash; the compliance, targeting, creative, naming, budget, and tracking
+  files every mode reads live before it does anything
+- **[Data access](Data-access)** &mdash; the two channels into Riteangle's real performance numbers, and
+  the one boundary that never gets crossed
+- **[Why it's built this way](Safety-and-guardrails)** &mdash; the safety reasoning behind the design
+- **[Working across machines](Working-across-machines)** &mdash; how a laptop and cloud sandbox sessions
+  stay in sync through GitHub alone
+- **[Command cheatsheet](Command-Cheatsheet)** &mdash; every `ad-agent` command, grouped by what you're
+  trying to do
+- **[Technical architecture](Technical-Architecture)** &mdash; the actual stack and module map, for a
+  technical reader
+- **[Agent registry](Agent-Registry)** &mdash; every skill by name, its procedure, and exactly where it
+  hands off to a human
+- **[Glossary](Glossary)** &mdash; plain-language definitions of the terms used across these pages

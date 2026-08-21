@@ -1,0 +1,85 @@
+# How the four modes work
+
+There is no single "run everything" command. Each mode is a Claude Code **skill** you invoke by asking
+for what you want in a session rooted in this repo &mdash; "set up an ad for the casual-selective women
+persona," "how are the live ads doing," "find me some new ideas," "look at this ad I found." The four
+modes chain into one loop, but nothing advances automatically from one to the next; a person decides
+when to move forward at every step.
+
+```mermaid
+flowchart TD
+    Idea1["ad-ideation\ndeep research: competitor creative,\nunused product stories, open hypotheses"]
+    Idea2["ad-intake\nlearn from an ad found elsewhere\n(screenshot, competitor link)"]
+    Verdict{"recommend or hold?"}
+    Setup["ad-setup-loop\nnames, targeting, creative, budget\n-> written recommendation"]
+    Human1(["You set it up by hand\nin Ads Manager"])
+    Live["Recommendation logged live,\nreal IDs on record"]
+    Audit["ad-audit\npull real performance,\njoin it to the recommendation"]
+    V2{"working / not-working /\ninconclusive?"}
+    Retro["Findings feed the next\nround of ideation"]
+
+    Idea1 --> Verdict
+    Idea2 --> Verdict
+    Verdict -->|"recommend"| Setup
+    Verdict -->|"hold"| Retro
+    Setup --> Human1 --> Live --> Audit --> V2
+    V2 -.-> Retro
+    Retro -.-> Idea1
+```
+
+## Mode 5 &mdash; `ad-setup-loop`: recommending a new ad
+
+Given a brief (an approved idea, an intake finding, or a direct ask), this mode reads every rule file
+under `rules/` live &mdash; never from memory &mdash; and works out campaign/ad-set/ad names (following
+[the naming convention](The-rules#naming) exactly, since a name that doesn't match it breaks
+`pocket-dating-coach`'s own spend/traffic join later), targeting, and a creative brief, plus a budget cap
+and duration that are never left out. Before anything is handed off, the finished recommendation is
+checked explicitly against `rules/compliance.md`, rule by rule &mdash; not just "this feels fine."
+
+The output is a checklist a person can follow without re-deriving anything: exactly what to name each
+level in Ads Manager and what to paste into targeting and budget fields. **The skill never touches Ads
+Manager itself.**
+
+## The one non-negotiable step
+
+Every recommendation, no matter which mode produced the idea behind it, stops at the same place: a
+person reads it, sets it up by hand, and reports back the real campaign/ad-set/ad IDs. Nothing in this
+system can create, publish, enable, or change budget on anything live. See
+[Why it's built this way](Safety-and-guardrails) for the reasoning.
+
+## Mode 6 &mdash; `ad-audit`: checking what's actually happening
+
+Once a recommendation is live, this mode pulls real performance numbers (see [Data access](Data-access))
+and joins each `live` record to its real outcome by `ad_set_id` &mdash; the same key
+`pocket-dating-coach`'s own analytics uses internally, which is why `log-setup` records it that way.
+Every verdict &mdash; `working`, `not-working`, or `inconclusive` &mdash; respects the same `MIN_SAMPLE =
+30` floor the product's own admin dashboard uses. Below that sample, "not enough data yet" is the
+correct, honest answer, not a guess dressed as a finding.
+
+## Mode 7 &mdash; `ad-ideation`: researching what to try next
+
+A deliberately looser mode &mdash; it's proposing hypotheses to test, not reporting on data that already
+exists. It looks at competitor creative (Meta Ads Library, Snap's public ads library), product stories
+that are built and live but never turned into an ad, and open hypotheses already flagged in
+`rules/targeting.md`. Every idea still ends in a plain verdict &mdash; **`recommend`** or **`hold`**
+&mdash; with an estimated spend, mirroring `ad-audit`'s own confidence discipline: an idea with no stated
+cost is missing the thing a person would actually decide on. An approved idea feeds straight into
+`ad-setup-loop`.
+
+## Mode 8 &mdash; `ad-intake`: learning from an ad found elsewhere
+
+The habit this mode serves: you see an ad somewhere &mdash; a competitor's Meta/Snap ad, a screenshot
+&mdash; and bring it here to learn from. It reads what's actually there (extracting the hook, the visual
+style, the claim, the call to action directly from a pasted image, not guessing at it), checks it against
+`rules/creative-style.md`'s competitive-landscape notes, and says specifically what's working or not
+&mdash; grounded in the actual creative, never generic ad-copy commentary. Anything a competitor does
+that Riteangle's own compliance rules forbid becomes a lesson in what *not* to copy, never a template.
+It can optionally turn into a formal idea and hand off to `ad-setup-loop`, the same way `ad-ideation`
+does.
+
+## Read next
+
+- [The ledger](The-ledger) &mdash; where every recommendation actually gets written down
+- [The rules](The-rules) &mdash; the files every mode reads before doing anything
+- [Agent registry](Agent-Registry) &mdash; the same loop, traced through the actual skill files and CLI
+  commands

@@ -1,41 +1,68 @@
-# Data Access
+# Data access
 
-## The principle
+Two separate channels reach into `pocket-dating-coach`'s real data, deliberately not one, with a firm
+rule for which does what.
 
-This agent should never re-derive `pocket-dating-coach`'s ad-analytics aggregation itself. That
-aggregation — the sample-size gating, the bot-traffic exclusion, the ad-set-keyed leaderboard — is
-several hundred carefully-tuned lines with exactly one correct owner. Anything this repo needs should
-come from calling that logic, never reimplementing a piece of it.
+```mermaid
+flowchart TB
+    Audit["ad-audit"]
 
-## Channel 1 — the authenticated analytics endpoint (primary)
+    subgraph Ch1["Channel 1 — primary, for anything already a computed metric"]
+        direction TB
+        Endpoint["/api/internal/ad-analytics\nauthenticated via ADS_AGENT_API_KEY\n(bearer token, not the admin session cookie)"]
+        Build["calls the exact same buildAdAnalytics()\nfunction the admin dashboard itself calls"]
+        Endpoint --> Build
+    end
 
-A route on `pocket-dating-coach`, `/api/internal/ad-analytics`, authenticated by a bearer token
-(`ADS_AGENT_API_KEY`) instead of the admin session cookie, calling the exact same `buildAdAnalytics()`
-function the admin dashboard itself uses and returning the identical JSON shape. This is the answer for
-any rate, tap rate, cost-per-signup, or verdict. `ad-agent fetch-analytics` calls this.
+    subgraph Ch2["Channel 2 — secondary, raw/exploratory only"]
+        direction TB
+        Role["ads_agent_ro\nleast-privilege, read-only Postgres role"]
+        Tables["SELECT only on:\nad_spend_daily · ad_demographics_daily ·\nmarketing_page_views · marketing_store_clicks ·\nuser_acquisition · ad_fx_rates"]
+        Role --> Tables
+    end
 
-**Status: not built yet.** This is one of two pieces of outstanding work on the `pocket-dating-coach`
-side — see [Open Work](Open-Work).
+    Boundary{{"Never reachable, by construction:\nverified_vibe_users or any other\nmember-data table"}}
 
-## Channel 2 — a least-privilege read-only database role (secondary)
+    Audit -->|"ad-agent fetch-analytics\n(a rate, a verdict, a leaderboard)"| Ch1
+    Audit -.->|"a one-off raw lookup\nthe endpoint doesn't answer"| Ch2
+    Ch2 -.->|"structurally cannot reach"| Boundary
+    Ch1 -.->|"structurally cannot reach"| Boundary
+```
 
-A Postgres role, `ads_agent_ro`, granted `SELECT` only, only on `ad_spend_daily`,
-`ad_demographics_daily`, `marketing_page_views`, `marketing_store_clicks`, `user_acquisition`, and
-`ad_fx_rates`. For raw, exploratory lookups the analytics endpoint doesn't answer — never for
-recomputing a number channel 1 already owns. Two independently-computed answers to the same question
-is a worse failure mode than not having the number at all.
+## Channel 1: the authenticated analytics endpoint (primary)
 
-**Status: not built yet.** The other piece of outstanding work — see [Open Work](Open-Work).
+`ad-agent fetch-analytics --start <date> --end <date> [--network ...] [--audience ...]` calls
+`pocket-dating-coach`'s `/api/internal/ad-analytics` endpoint, checked with a bearer token
+(`ADS_AGENT_API_KEY`) instead of the admin session cookie. It returns the exact same JSON
+`buildAdAnalytics()` produces for the real admin dashboard &mdash; the same `MIN_SAMPLE = 30` gate, the
+same bot-traffic exclusion, the same ad-set-keyed leaderboard. This repo never re-derives that
+aggregation itself; `pocket-dating-coach` stays the single owner of every rate, gate, and total.
 
-## The boundary that doesn't move
+**This is not live yet.** It's wired up and waiting on a small `pocket-dating-coach` pull request that
+adds the route and the API key check &mdash; being built in a separate session, on the
+`pocket-dating-coach` repo, not this one. Until it ships, `fetch-analytics` fails with a clear message
+rather than a stack trace, and `ad-audit` says so plainly rather than falling back to a guess.
 
-This agent never gets read access to `verified_vibe_users` or any other table carrying member data —
-names, emails, chat transcripts, trust scores. The read-only role above is scoped to marketing/ad
-tables by construction; there is no path from this agent to member data, by design, not by convention.
+## Channel 2: a least-privilege read-only database role (secondary)
 
-## Where secrets live
+`ads_agent_ro` &mdash; not built yet either &mdash; is scoped to `SELECT` on six marketing/spend tables
+only (`ad_spend_daily`, `ad_demographics_daily`, `marketing_page_views`, `marketing_store_clicks`,
+`user_acquisition`, `ad_fx_rates`), configured via `config.local.yaml`'s `pdc.readonly_db_url`. It exists
+purely for raw, exploratory lookups the analytics endpoint doesn't answer &mdash; a freshness check, a
+one-off row inspection &mdash; **never to recompute a rate or verdict channel 1 already owns.** Two
+independently-computed answers to "what's the tap rate on this ad set" would be a worse failure mode
+than not having the number at all, so this rule holds even once the role exists.
 
-`ADS_AGENT_API_KEY` and the `ads_agent_ro` connection string are never committed to either repository.
-They live only in this repo's own `config.local.yaml`, which is gitignored — see `config.example.yaml`
-for the shape. A fresh clone of this repo (on a laptop or in a sandbox) has neither value until someone
-puts them there deliberately.
+## The boundary that holds regardless of which channel is used
+
+This agent never gets read access to `verified_vibe_users` or any other table carrying member data
+&mdash; names, emails, chat transcripts, trust scores. This isn't a policy someone has to remember to
+respect; it's structurally true, because the granted database role is scoped to marketing/ad tables only
+by construction, and the analytics endpoint returns aggregated ad metrics, never member records.
+
+## Read next
+
+- [Safety-and-guardrails](Safety-and-guardrails) &mdash; how this boundary relates to the other one (Ads
+  Manager is never written to)
+- [Command cheatsheet](Command-Cheatsheet) &mdash; the exact `fetch-analytics` invocation
+- [How the four modes work](How-the-four-modes-work) &mdash; where `ad-audit` uses this data
