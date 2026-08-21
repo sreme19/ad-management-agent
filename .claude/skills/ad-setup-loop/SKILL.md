@@ -26,6 +26,9 @@ These are the actual product rules, and they may have been refined since you las
 - `rules/naming.md` — the exact campaign/ad-set/ad naming convention. A name that doesn't match this
   breaks the spend/traffic join in `pocket-dating-coach`'s own analytics later — this is not cosmetic.
 - `rules/budget.md` — the operating envelope, minimum viable daily spend, and the kill/double rule.
+- `rules/tracking.md` — the UTM parameters every ad's Website URL must carry, and the pre-/post-launch
+  verification checklist. Non-optional: a 2026-08-21 incident lost a full week of Snap spend to
+  unattributable installs because this wasn't checked before launch.
 
 If the user refines any rule mid-conversation, **edit the rule file itself in the same turn** — don't
 just apply the change once and let it evaporate. The next `ad-audit` run, and the next session, both
@@ -67,7 +70,15 @@ depend on that file being current.
    `rec_id` plainly — that id is what they'll need for the next step.
 8. **Hand it back.** The user sets this up by hand in Ads Manager. Tell them exactly what to name each
    level and what to paste into targeting/budget fields — this should read like a checklist they can
-   follow without re-deriving anything.
+   follow without re-deriving anything. Include the full UTM string from `rules/naming.md`/
+   `rules/tracking.md` verbatim as one of the fields to paste — don't make them re-derive it from the
+   scheme.
+9. **Pre-launch tracking check — before the ad goes live, every time.** Per `rules/tracking.md`: open
+   the ad's actual Website URL field and confirm every macro (`utm_term`, `utm_id`, `utm_content`) is
+   present and set at the ad level, then click the ad's own preview/swipe-up link and confirm the
+   resulting URL has every macro resolved to a real value, not left blank or literal
+   (`{{adSet.id}}`/`{{ad.id}}`). Tell the user to do this and confirm back before spend starts — do not
+   treat it as implied by "the ad is set up."
 
 ## Closing the loop — do this every time, don't let it go unresolved
 
@@ -79,6 +90,13 @@ ad-agent log-setup <rec_id> --network snap|meta \
   --campaign-id <real> --ad-set-id <real> --ad-id <real> \
   [--deviated "what changed from the brief, and why"]
 ```
+
+**Then, within the first hour of real traffic, run the post-launch check from `rules/tracking.md`:**
+confirm `pocket-dating-coach`'s `user_acquisition` rows for this network since launch carry the real
+`utm_term`/`utm_id`, not the landing page's hardcoded default. `log-setup` is not done until this has
+been checked once against live data — an id logged without a verified live check is exactly the gap
+that let the 2026-08-21 incident run for a full week undetected. If the check shows the default is
+firing, tell the user immediately and treat it as a live incident, not a note for the next `ad-audit`.
 
 If the user decides not to execute a proposal at all, close it out explicitly rather than leaving it to
 rot as `proposed` forever:

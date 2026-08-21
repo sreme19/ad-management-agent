@@ -55,9 +55,15 @@ attribute spend or performance to later.
 
 ## UTM scheme (append to every landing URL)
 
+**See `rules/tracking.md` for the full protocol and the 2026-08-21 incident that made this
+non-negotiable — read it before setting up a new ad, not after.**
+
 ```
-https://www.riteangle.dating/get?utm_source={snapchat|meta}&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_term={{adSet.name}}&utm_content={{ad.name}}
+https://www.riteangle.dating/get?utm_source={snapchat|meta}&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_term={{adSet.id}}&utm_id={{ad.id}}&utm_content={{ad.name}}
 ```
 
-`utm_term` carries the ad set name/id, `utm_content` carries the ad (creative) id — this is what
-`ad-analytics.ts`'s `adSetKeyOf` parses on the traffic side of the join.
+`utm_term` carries the ad set id. **`utm_id` is the parameter `traffic-quality.ts`'s `adSetKeyOf`
+actually reads as the Snap ad id — set it explicitly on every ad's own Website URL field, never assume
+Snap appends it automatically.** (`utm_content` is a human-readable ad name for manual cross-checking
+only — on Snap it is not what the join uses, despite an earlier version of this doc saying otherwise;
+on Meta, `utm_content` is the one that matters instead. Don't mix the two networks' conventions.)

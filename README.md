@@ -33,6 +33,8 @@ human executes by hand.
   competitive landscape.
 - `rules/naming.md` — the campaign/ad-set/ad naming convention already in production use.
 - `rules/budget.md` — the operating envelope and the kill/double rule.
+- `rules/tracking.md` — the UTM parameters every ad must carry and the pre-/post-launch verification
+  checklist; a 2026-08-21 incident lost a week of Snap spend to unattributable installs by skipping it.
 
 If a rule gets refined mid-conversation, the skill edits the file in place — these are living
 documents, not a snapshot.
