@@ -1,0 +1,25 @@
+# Copy this to config.local.yaml (gitignored, never committed) and fill in
+# real values. Nothing in this file is secret; config.local.yaml is where
+# secrets live.
+
+ledger:
+  # Directory containing campaigns/ and INDEX.md. Defaults to the repo root
+  # if you never create config.local.yaml at all — the CLI works out of the
+  # box with zero setup for anything that doesn't need PDC access.
+  root: "."
+
+pdc:
+  # pocket-dating-coach's authenticated internal analytics endpoint (see
+  # SPEC.md, "Data access"). Returns the exact same JSON buildAdAnalytics()
+  # produces for the admin dashboard — this repo never re-derives that
+  # aggregation itself. Not live until the pocket-dating-coach PR adding
+  # this route has shipped.
+  analytics_url: "https://pocket-dating-coach.vercel.app/api/internal/ad-analytics"
+  # The ADS_AGENT_API_KEY value set as a Vercel env var on pocket-dating-coach.
+  api_key: ""
+
+  # Optional, secondary channel: a least-privilege read-only Postgres role
+  # (ads_agent_ro) scoped to marketing/spend tables only — never member data.
+  # Used only for raw/exploratory queries the analytics endpoint doesn't
+  # answer; never to recompute a rate or verdict the endpoint already owns.
+  readonly_db_url: ""

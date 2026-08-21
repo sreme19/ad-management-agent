@@ -1,0 +1,212 @@
+"""Deterministic, zero-API ledger for ad campaign recommendations.
+
+Nothing in this file calls the Anthropic API or any LLM. Every function here
+is a pure file read/write. The actual reasoning (targeting, creative, copy)
+happens live in whichever Claude Code session is running the skill that
+calls into this module via the CLI — this module only persists the result.
+
+Lifecycle: proposed -> executing -> live -> reviewed, with an `abandoned`
+side-exit from `proposed`. See SPEC.md "Ledger" for the full rationale.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+STATUSES = ("proposed", "executing", "live", "reviewed", "abandoned")
+VERDICTS = ("working", "not-working", "inconclusive")
+
+_FRONT_MATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.S)
+
+
+def slugify(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return s or "campaign"
+
+
+def new_rec_id(slug: str, today: str) -> str:
+    return f"rec-{today}-{slug}"
+
+
+@dataclass
+class Record:
+    path: Path
+    front_matter: dict
+    body: str
+
+    @property
+    def rec_id(self) -> str:
+        return self.front_matter["rec_id"]
+
+    @property
+    def status(self) -> str:
+        return self.front_matter["status"]
+
+    def save(self) -> None:
+        fm = yaml.safe_dump(self.front_matter, sort_keys=False).strip()
+        self.path.write_text(f"---\n{fm}\n---\n{self.body}", encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: Path) -> "Record":
+        text = path.read_text(encoding="utf-8")
+        m = _FRONT_MATTER_RE.match(text)
+        if not m:
+            raise ValueError(f"{path}: missing YAML front matter")
+        fm = yaml.safe_load(m.group(1)) or {}
+        return cls(path=path, front_matter=fm, body=m.group(2))
+
+
+class Ledger:
+    def __init__(self, root: Path):
+        self.root = Path(root)
+        self.campaigns_dir = self.root / "campaigns"
+        self.campaigns_dir.mkdir(parents=True, exist_ok=True)
+
+    def _record_path(self, slug: str) -> Path:
+        return self.campaigns_dir / slug / "record.md"
+
+    def find(self, rec_id: str) -> Record:
+        for p in sorted(self.campaigns_dir.glob("*/record.md")):
+            rec = Record.load(p)
+            if rec.rec_id == rec_id:
+                return rec
+        raise KeyError(f"no record with rec_id {rec_id!r}")
+
+    def all(self) -> list[Record]:
+        return [Record.load(p) for p in sorted(self.campaigns_dir.glob("*/record.md"))]
+
+    def propose(
+        self,
+        *,
+        slug: str,
+        network: str,
+        campaign_name: str,
+        ad_set_name: str,
+        ad_name: str,
+        targeting_summary: str,
+        creative_ref: str,
+        budget_cap_inr_per_day: float,
+        duration_days: int,
+        brief_path: str,
+        today: str,
+    ) -> Record:
+        base_slug = slugify(slug)
+        slug = base_slug
+        path = self._record_path(slug)
+        i = 2
+        while path.exists():
+            slug = f"{base_slug}-{i}"
+            path = self._record_path(slug)
+            i += 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        rec_id = new_rec_id(slug, today)
+        fm = {
+            "rec_id": rec_id,
+            "network": network,
+            "status": "proposed",
+            "campaign_name": campaign_name,
+            "ad_set_name": ad_set_name,
+            "ad_name": ad_name,
+            "campaign_id": None,
+            "ad_set_id": None,
+            "ad_id": None,
+            "targeting_summary": targeting_summary,
+            "creative_ref": creative_ref,
+            "budget_cap_inr_per_day": budget_cap_inr_per_day,
+            "duration_days": duration_days,
+            "created": today,
+        }
+        brief = Path(brief_path).read_text(encoding="utf-8") if brief_path else ""
+        body = f"\n## Brief (proposed)\n\n{brief.strip()}\n"
+        rec = Record(path=path, front_matter=fm, body=body)
+        rec.save()
+        return rec
+
+    def log_setup(
+        self,
+        rec_id: str,
+        *,
+        network: str,
+        campaign_id: str,
+        ad_set_id: str,
+        ad_id: str,
+        deviated: str | None,
+        today: str,
+    ) -> Record:
+        rec = self.find(rec_id)
+        if rec.front_matter.get("network") != network:
+            raise ValueError(
+                f"{rec_id} was proposed for network={rec.front_matter.get('network')!r}, "
+                f"not {network!r}"
+            )
+        rec.front_matter.update(
+            {
+                "status": "live",
+                "campaign_id": campaign_id,
+                "ad_set_id": ad_set_id,
+                "ad_id": ad_id,
+                "executed": today,
+            }
+        )
+        section = (
+            f"\n## Execution\n\n- Date: {today}\n- Campaign ID: {campaign_id}\n"
+            f"- Ad set ID: {ad_set_id}\n- Ad ID: {ad_id}\n"
+        )
+        if deviated:
+            section += f"- Deviated from brief: {deviated}\n"
+        rec.body += section
+        rec.save()
+        return rec
+
+    def log_review(
+        self,
+        rec_id: str,
+        *,
+        verdict: str,
+        summary: str,
+        review_log_path: str | None,
+        today: str,
+    ) -> Record:
+        if verdict not in VERDICTS:
+            raise ValueError(f"verdict must be one of {VERDICTS}, got {verdict!r}")
+        rec = self.find(rec_id)
+        rec.front_matter.update({"status": "reviewed", "verdict": verdict, "reviewed": today})
+        detail = Path(review_log_path).read_text(encoding="utf-8") if review_log_path else ""
+        rec.body += (
+            f"\n## Review\n\n- Date: {today}\n- Verdict: {verdict}\n- Summary: {summary}\n\n"
+            f"{detail.strip()}\n"
+        )
+        rec.save()
+        return rec
+
+    def abandon(self, rec_id: str, *, reason: str, today: str) -> Record:
+        rec = self.find(rec_id)
+        rec.front_matter.update({"status": "abandoned", "abandoned": today})
+        rec.body += f"\n## Abandoned\n\n- Date: {today}\n- Reason: {reason}\n"
+        rec.save()
+        return rec
+
+    def write_index(self) -> Path:
+        records = self.all()
+        lines = [
+            "<!-- Generated by `ad-agent`. Do not hand-edit — regenerated on every ledger command. -->",
+            "",
+            "# Campaign ledger index",
+            "",
+            "| rec_id | network | status | campaign | ad set id | verdict | created |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for r in records:
+            fm = r.front_matter
+            lines.append(
+                f"| {fm.get('rec_id', '')} | {fm.get('network', '')} | {fm.get('status', '')} | "
+                f"{fm.get('campaign_name') or ''} | {fm.get('ad_set_id') or ''} | "
+                f"{fm.get('verdict') or ''} | {fm.get('created', '')} |"
+            )
+        out = self.root / "INDEX.md"
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return out
