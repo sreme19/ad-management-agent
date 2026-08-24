@@ -1,7 +1,7 @@
 # ad-management-agent — Spec
 
-**Status: v1 scaffold.** Ledger CLI (`propose` / `log-setup` / `log-review` / `abandon` / `stats` /
-`dump-ledger` / `fetch-analytics`) and four skills are built. `fetch-analytics` cannot do anything
+**Status: v1 scaffold.** Ledger CLI (`propose` / `amend` / `log-setup` / `log-review` / `abandon` /
+`stats` / `dump-ledger` / `fetch-analytics`) and four skills are built. `fetch-analytics` cannot do anything
 real yet — it depends on a small `pocket-dating-coach` PR (see "Data access") that has not landed.
 
 ## Problem framing
@@ -74,10 +74,16 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
     from `pocket-dating-coach`'s exports plus the public Meta Ads Library / Snap ad search — never a
     direct, credentialed connection to either ad platform. This is what makes #3 structurally true
     rather than merely a policy: the agent has no credential that *could* touch a live account.
-11. **Creative asset library builds incrementally**, via `ad-intake`'s discoveries plus a one-time
+11. **The destination has an audience, and the gate that enforces it is hard.** `propose` refuses to
+    write a record whose ad-set audience doesn't match the framing of its landing page, per
+    `rules/destinations.yaml`. There is no override flag and `amend` cannot launder one — a blocked
+    proposal is unblocked by building the page and registering it, never by a command-line escape
+    hatch. Origin: the first live lead campaigns produced 98% male lead-form submissions and 100% male
+    `/get` store taps, and `/get` is written in the second person to a man throughout.
+12. **Creative asset library builds incrementally**, via `ad-intake`'s discoveries plus a one-time
     manual export of whatever's already running when this repo is stood up — no attempt to backfill
     everything from Ads Manager on day one.
-12. **Ledger format: markdown + YAML front matter, one file per campaign, plus a generated index** — not
+13. **Ledger format: markdown + YAML front matter, one file per campaign, plus a generated index** — not
     a spreadsheet, not plain JSON. See "Ledger" below for the reasoning (the ledger has two readers,
     human and agent, and needs to serve both without a second source of truth to keep in sync).
 
@@ -116,7 +122,7 @@ they are load-bearing: the iOS build was actually rejected under App Store Guide
 Skill (live reasoning, in a Claude Code session)
   → does the actual research / targeting / creative work
   → persists through ad-agent's zero-API CLI (this repo)
-       propose / log-setup / log-review / abandon / stats / dump-ledger
+       propose / amend / log-setup / log-review / abandon / stats / dump-ledger
   → pulls read-only data through ad-agent's zero-API CLI
        fetch-analytics  (channel 1: pocket-dating-coach's authenticated endpoint)
 ```
@@ -145,13 +151,20 @@ Lifecycle:
 
 ```
 proposed → executing → live → reviewed
-              ↓
-          abandoned
+    ↑ ↓           ↓
+  amend       abandoned
 ```
 
 - `ad-agent propose <slug> ...` — mode 5's output. Requires network, campaign/ad-set/ad names,
   targeting summary, a creative reference, a budget cap, a duration, and a brief file (the free-form
   reasoning). Generates a `rec_id`, writes `campaigns/<slug>/record.md`, status `proposed`.
+- `ad-agent amend <rec_id> --reason ... [--ad-name ...] [...]` — revise a still-`proposed`
+  recommendation before it is executed, appending an `## Amendment` section recording every
+  field that moved. **Only `proposed` records may be amended**: once a record is `live` its fields
+  describe what was actually built, and rewriting them would falsify the thing `ad-audit` joins a real
+  outcome back to — a post-launch change is a `log-setup --deviated` note instead. Amending
+  `ad_set_name` or `destination_url` re-runs the destination gate against the resulting pair, so
+  `amend` cannot be used as the override flag the gate deliberately doesn't have.
 - `ad-agent log-setup <rec_id> ...` — after you set the ad up by hand. Real campaign/ad-set/ad IDs,
   optional `--deviated` note for anything that changed from the brief. Status → `live`. The `ad_set_id`
   recorded here is deliberately the same join key `ad-analytics.ts` uses internally
@@ -180,7 +193,7 @@ turn rather than applying the change once and letting it evaporate.
 
 ## Creatives
 
-`creatives/` builds incrementally (decision #11) — see `creatives/README.md` for the naming convention
+`creatives/` builds incrementally (decision #12) — see `creatives/README.md` for the naming convention
 tying an asset to the `rec_id`/`ad_id` that used it.
 
 ## Open / deferred

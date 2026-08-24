@@ -88,6 +88,7 @@ class Ledger:
         ad_name: str,
         targeting_summary: str,
         creative_ref: str,
+        destination_url: str,
         budget_cap_inr_per_day: float,
         duration_days: int,
         brief_path: str,
@@ -116,6 +117,7 @@ class Ledger:
             "ad_id": None,
             "targeting_summary": targeting_summary,
             "creative_ref": creative_ref,
+            "destination_url": destination_url,
             "budget_cap_inr_per_day": budget_cap_inr_per_day,
             "duration_days": duration_days,
             "created": today,
@@ -125,6 +127,67 @@ class Ledger:
         rec = Record(path=path, front_matter=fm, body=body)
         rec.save()
         return rec
+
+    AMENDABLE = (
+        "campaign_name",
+        "ad_set_name",
+        "ad_name",
+        "targeting_summary",
+        "creative_ref",
+        "destination_url",
+        "budget_cap_inr_per_day",
+        "duration_days",
+    )
+
+    def amend(
+        self,
+        rec_id: str,
+        *,
+        changes: dict,
+        reason: str,
+        today: str,
+    ) -> tuple[Record, dict]:
+        """Revise a still-proposed recommendation, keeping an audit trail of what moved.
+
+        Only `proposed` records may be amended. Once a record is `live` the fields
+        describe what was actually built, and rewriting them would silently falsify
+        the thing `ad-audit` joins a real outcome back to — a change after launch is a
+        `log-setup --deviated` note, not an amendment. `reviewed`/`abandoned` are history.
+
+        Returns the record and a {field: (old, new)} diff of what actually changed.
+        """
+        rec = self.find(rec_id)
+        status = rec.front_matter.get("status")
+        if status != "proposed":
+            raise ValueError(
+                f"{rec_id} is {status!r}, not 'proposed' — only a proposal can be amended.\n"
+                "A change to something already live belongs in `log-setup --deviated`, which "
+                "records what differed rather than rewriting what was proposed."
+            )
+
+        bad = [k for k in changes if k not in self.AMENDABLE]
+        if bad:
+            raise ValueError(
+                f"not amendable: {', '.join(sorted(bad))}. "
+                f"Amendable fields are: {', '.join(self.AMENDABLE)}."
+            )
+
+        diff = {}
+        for field, new in changes.items():
+            old = rec.front_matter.get(field)
+            if old != new:
+                diff[field] = (old, new)
+
+        if not diff:
+            return rec, diff
+
+        rec.front_matter.update({f: n for f, (_, n) in diff.items()})
+        rec.front_matter["amended"] = today
+
+        rows = "\n".join(f"- `{f}`: {old!r} → {new!r}" for f, (old, new) in sorted(diff.items()))
+        rec.body += f"\n## Amendment ({today})\n\n- Reason: {reason}\n{rows}\n"
+        rec.save()
+        return rec, diff
 
     def log_setup(
         self,

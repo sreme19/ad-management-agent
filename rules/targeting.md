@@ -53,7 +53,13 @@ hypothesis for `ad-ideation`, not a settled call.
 
 ## Other targeting parameters
 
-- Separate ad sets by gender — never a mixed-gender ad set.
+- Separate ad sets by gender — never a mixed-gender ad set. The gender goes in the ad-set name as a
+  whole token (`WOMEN_18-22_CASUAL_LPV`) — `ad-agent propose` reads it from there to run the
+  destination gate, so a name without one is rejected.
+- **The destination has an audience too.** A page written in the second person to a man does not
+  become a women's landing page because a women's ad points at it. `rules/destinations.yaml` records
+  whose POV each page occupies and `propose` enforces the match — see that file for why (98% of
+  lead-form submissions and 100% of `/get` store taps were men).
 - Lifestyle interest categories that map to the personas: Dating & Relationships, Travel, Lifestyle,
   Career/Tech, Nightlife.
 - Android-heavy device targeting where the platform allows it (the Play Store listing is the primary

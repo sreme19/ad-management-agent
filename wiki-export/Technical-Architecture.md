@@ -20,16 +20,18 @@ instead &mdash; this page assumes you're comfortable with terms like "CLI" and "
 
 ```mermaid
 flowchart TB
-    CLI["cli.py\nargparse subcommands:\npropose · log-setup · log-review ·\nabandon · stats · dump-ledger · fetch-analytics"]
+    CLI["cli.py\nargparse subcommands:\npropose · amend · log-setup · log-review ·\nabandon · stats · dump-ledger · fetch-analytics"]
 
     subgraph Core["src/ad_management_agent/"]
         Config["config.py\nloads config.local.yaml,\nfalls back to repo-root defaults"]
         Ledger["ledger.py\nRecord + Ledger classes —\nall file read/write, index generation"]
+        Destinations["destinations.py\nthe destination gate —\nreads rules/destinations.yaml,\nraises before anything is written"]
     end
 
     Skills[".claude/skills/*/SKILL.md\nad-setup-loop · ad-audit ·\nad-ideation · ad-intake"]
 
-    Rules["rules/*.md\ncompliance · targeting ·\ncreative-style · naming · budget"]
+    Rules["rules/*.md\ncompliance · targeting · creative-style ·\ncreative-generation · naming · budget · tracking"]
+    DestRule[("rules/destinations.yaml\nthe one rule file code reads")]
 
     Campaigns[("campaigns/<slug>/record.md\none file per recommendation")]
     Index[("INDEX.md\ngenerated rollup")]
@@ -38,6 +40,8 @@ flowchart TB
     Skills -->|"reads live, every time"| Rules
     Skills -->|"shells out to"| CLI
     CLI --> Config
+    CLI -->|"propose / amend:\ngate before any write"| Destinations
+    Destinations --> DestRule
     CLI --> Ledger
     Ledger --> Campaigns
     Ledger --> Index

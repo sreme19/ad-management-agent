@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from . import destinations
 from .config import load_config
 from .ledger import STATUSES, Ledger
 
@@ -24,6 +25,18 @@ def _today() -> str:
 
 
 def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
+    # Hard gate, before anything is written: an ad set may not point at a page
+    # framed for a different audience. See rules/destinations.yaml — no override.
+    try:
+        destinations.check(
+            ad_set_name=args.ad_set_name,
+            destination_url=args.destination_url,
+            rules_dir=ledger.root / "rules",
+        )
+    except destinations.DestinationGateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
     rec = ledger.propose(
         slug=args.slug,
         network=args.network,
@@ -32,6 +45,7 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
         ad_name=args.ad_name,
         targeting_summary=args.targeting_summary,
         creative_ref=args.creative_ref,
+        destination_url=args.destination_url,
         budget_cap_inr_per_day=args.budget_cap,
         duration_days=args.duration_days,
         brief_path=args.brief,
@@ -39,6 +53,59 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
     )
     ledger.write_index()
     print(f"proposed {rec.rec_id} -> {rec.path}")
+
+
+def cmd_amend(args: argparse.Namespace, ledger: Ledger) -> None:
+    fields = {
+        "campaign_name": args.campaign_name,
+        "ad_set_name": args.ad_set_name,
+        "ad_name": args.ad_name,
+        "targeting_summary": args.targeting_summary,
+        "creative_ref": args.creative_ref,
+        "destination_url": args.destination_url,
+        "budget_cap_inr_per_day": args.budget_cap,
+        "duration_days": args.duration_days,
+    }
+    changes = {k: v for k, v in fields.items() if v is not None}
+    if not changes:
+        print("error: nothing to amend — pass at least one field to change", file=sys.stderr)
+        raise SystemExit(2)
+
+    rec = ledger.find(args.rec_id)
+
+    # Close the loophole: amend must not be a way around the destination gate.
+    # Re-run it whenever this amendment touches the audience or the destination,
+    # against the *resulting* pair rather than only the changed half. Amendments
+    # that touch neither are left alone deliberately, so a record already blocked
+    # by the gate can still have unrelated fields repaired.
+    if "ad_set_name" in changes or "destination_url" in changes:
+        effective_ad_set = changes.get("ad_set_name", rec.front_matter.get("ad_set_name", ""))
+        effective_dest = changes.get("destination_url", rec.front_matter.get("destination_url", ""))
+        try:
+            destinations.check(
+                ad_set_name=effective_ad_set,
+                destination_url=effective_dest,
+                rules_dir=ledger.root / "rules",
+            )
+        except destinations.DestinationGateError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
+
+    try:
+        rec, diff = ledger.amend(
+            args.rec_id, changes=changes, reason=args.reason, today=_today()
+        )
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    if not diff:
+        print(f"{rec.rec_id}: no change — every field already had that value")
+        return
+    ledger.write_index()
+    print(f"amended {rec.rec_id} -> {rec.path}")
+    for field, (old, new) in sorted(diff.items()):
+        print(f"  {field}: {old!r} -> {new!r}")
 
 
 def cmd_log_setup(args: argparse.Namespace, ledger: Ledger) -> None:
@@ -99,7 +166,7 @@ def cmd_dump_ledger(args: argparse.Namespace, ledger: Ledger) -> None:
     if args.status:
         lines = text.splitlines()
         header, rows = lines[:6], lines[6:]
-        rows = [l for l in rows if f"| {args.status} |" in l]
+        rows = [r for r in rows if f"| {args.status} |" in r]
         text = "\n".join(header + rows)
     print(text)
 
@@ -148,10 +215,35 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--ad-name", required=True)
     sp.add_argument("--targeting-summary", required=True)
     sp.add_argument("--creative-ref", required=True, help="path or id under creatives/")
+    sp.add_argument(
+        "--destination-url",
+        required=True,
+        help="the landing URL this ad set sends traffic to; checked against rules/destinations.yaml",
+    )
     sp.add_argument("--budget-cap", required=True, type=float, help="INR per day")
     sp.add_argument("--duration-days", required=True, type=int)
     sp.add_argument("--brief", required=True, help="path to a markdown brief file")
     sp.set_defaults(func=cmd_propose)
+
+    sp = sub.add_parser(
+        "amend",
+        help="Revise a still-proposed recommendation, with an audit trail of what changed",
+    )
+    sp.add_argument("rec_id")
+    sp.add_argument("--reason", required=True, help="why this proposal is being revised")
+    sp.add_argument("--campaign-name", default=None)
+    sp.add_argument("--ad-set-name", default=None)
+    sp.add_argument("--ad-name", default=None)
+    sp.add_argument("--targeting-summary", default=None)
+    sp.add_argument("--creative-ref", default=None)
+    sp.add_argument(
+        "--destination-url",
+        default=None,
+        help="re-runs the rules/destinations.yaml gate against the resulting pair",
+    )
+    sp.add_argument("--budget-cap", default=None, type=float, help="INR per day")
+    sp.add_argument("--duration-days", default=None, type=int)
+    sp.set_defaults(func=cmd_amend)
 
     sp = sub.add_parser("log-setup", help="Record the real IDs after setting the ad up by hand")
     sp.add_argument("rec_id")

@@ -72,6 +72,23 @@ a person and every skill read the same way, and a private GitHub repo already pr
 decision #9 states this plainly: the repo is private because targeting, budget, and creative strategy
 are business-sensitive.
 
+## An audience is never sent to a page written for someone else
+
+The first live lead campaigns produced **98% male lead-form submissions and 100% male store taps**.
+Part of that was creative, but the harder blocker was the destination: Riteangle's `/get` page is
+written in the second person to a man on every line, so a woman tapping a women's ad landed on a page
+about how a man gets in front of her.
+
+`ad-agent propose` now refuses to write a record whose ad-set audience doesn't match the framing of its
+landing page, per the registry in `rules/destinations.yaml`. Unregistered pages fail closed rather than
+being assumed safe.
+
+What makes this a real guardrail rather than a warning is that **there is no override flag**, and
+`ad-agent amend` re-runs the same check rather than offering a way around it. A blocked proposal is
+unblocked by building the page and registering it &mdash; which is the point, because the alternative is
+spending real money sending an audience somewhere that cannot convert it. The trade-off was deliberate
+and is worth naming: this can block a campaign on a web change that hasn't shipped yet.
+
 ## A recommendation is a proposal, not an action, until a human closes the loop
 
 Every `ad-setup-loop` output starts life as `proposed` in [the ledger](The-ledger) &mdash; not `live`,

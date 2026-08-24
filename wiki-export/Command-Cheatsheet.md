@@ -11,12 +11,35 @@ ad-agent propose <slug> \
   --network snap|meta \
   --campaign-name "..." --ad-set-name "..." --ad-name "..." \
   --targeting-summary "..." --creative-ref "creatives/<path-or-id>" \
+  --destination-url "https://www.riteangle.dating/<page>" \
   --budget-cap <INR/day> --duration-days <n> \
   --brief /tmp/brief.md
 ```
 Generates a `rec_id`, writes `campaigns/<slug>/record.md` with status `proposed`, regenerates
-`INDEX.md`. You generally won't type this by hand &mdash; `ad-setup-loop` runs it once the
-recommendation is ready and hands you the `rec_id` plainly.
+`INDEX.md`. **`--destination-url` is checked against `rules/destinations.yaml` before anything is
+written** &mdash; if the ad set's audience doesn't match the landing page's framing, if the page can't
+take paid traffic, or if it isn't registered at all, the command refuses and writes nothing. There is
+no flag that skips this; see [The rules](The-rules) for why.
+
+You generally won't type this by hand &mdash; `ad-setup-loop` runs it once the recommendation is ready
+and hands you the `rec_id` plainly.
+
+## "This proposal needs correcting before I run it"
+
+```
+ad-agent amend <rec_id> --reason "why" \
+  [--campaign-name ...] [--ad-set-name ...] [--ad-name ...] \
+  [--targeting-summary ...] [--creative-ref ...] [--destination-url ...] \
+  [--budget-cap ...] [--duration-days ...]
+```
+Revises a still-`proposed` record and appends an `## Amendment` section recording every field that
+moved and why &mdash; so a correction is visible rather than silently overwriting what was proposed.
+Use this instead of hand-editing a record.
+
+**Only `proposed` records can be amended.** Once a record is `live` its fields describe what was
+actually built, and rewriting them would falsify the thing `ad-audit` joins a real outcome back to
+&mdash; a post-launch difference belongs in `log-setup --deviated` instead. Amending `--ad-set-name` or
+`--destination-url` re-runs the destination gate against the resulting pair.
 
 ## "I set the ad up by hand — log the real IDs"
 

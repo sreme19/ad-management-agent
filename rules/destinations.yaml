@@ -1,0 +1,48 @@
+# Destination registry — machine-readable, enforced by `ad-agent propose`
+#
+# This is the only rule file the CLI reads directly (every other file under
+# rules/ is read live by a skill), because it backs a hard gate: propose
+# REFUSES to write a record whose ad-set audience doesn't match the framing of
+# the page it sends traffic to.
+#
+# Why it exists: on 2026-08-24 a review of the first live Snap/Meta lead
+# campaigns found 98% of lead-form submissions and 100% of /get -> Play Store
+# taps were men. Part of that is creative (see rules/creative-generation.md
+# section 1), but the destination is the harder blocker — /get is written
+# entirely in the second person to a man ("She asked how you spend your
+# weekends", "2 left -> then she sees you", "Never a ranking against men he
+# cannot see"). A woman who taps a women's ad lands on a page explaining how a
+# man gets in front of her.
+#
+# How the gate opens: build the woman-facing destination, then add it here with
+# audience: women. Editing this file is the intended and only way to unblock a
+# blocked proposal — there is deliberately no --force flag, because an override
+# flag would make the gate advisory and this one is meant to hold.
+#
+# `audience`     men | women | neutral — whose point of view the page's copy
+#                occupies. `neutral` matches any ad set.
+# `paid_traffic` false means the page cannot receive paid traffic at all
+#                (e.g. token-gated), regardless of audience match.
+# `verified`     the date someone actually read the page's copy to classify it.
+#                Re-read and re-date it when the page changes.
+
+destinations:
+  /get:
+    audience: men
+    paid_traffic: true
+    verified: 2026-08-24
+    note: >-
+      Second person is the man on every line; she is third person throughout.
+      Currently the only public destination carrying the tracking.md UTM scheme.
+      Needs either a women's variant switched off a UTM param, or a separate
+      public route, before any women-targeted ad set can point at it.
+
+  /beta:
+    audience: women
+    paid_traffic: false
+    verified: 2026-08-24
+    note: >-
+      The women's invite flow, and referenced as such by a comment at
+      src/routes/get/+page.svelte:19 in pocket-dating-coach. Implemented as
+      /beta/[token] — invite-token-gated, so it cannot serve paid traffic even
+      though its audience matches. Not a substitute for a public women's page.

@@ -30,7 +30,7 @@ same rollup to the terminal for an ad hoc copy-paste, but the markdown files sta
 ## What's actually in a record
 
 The front matter carries the structured fields: `rec_id`, `network`, `status`, the three names
-(campaign/ad set/ad), `targeting_summary`, `creative_ref`, `budget_cap_inr_per_day`, `duration_days`, and
+(campaign/ad set/ad), `targeting_summary`, `creative_ref`, `destination_url`, `budget_cap_inr_per_day`, `duration_days`, and
 &mdash; once set up &mdash; the real `campaign_id` / `ad_set_id` / `ad_id`, plus `verdict` once reviewed.
 The body accumulates a section per stage: the original brief, an **Execution** section (with a
 `--deviated` note if anything changed from the brief at setup time), and a **Review** section (the
@@ -40,11 +40,16 @@ verdict, a summary, and an optional longer review-detail file).
 
 ```
 proposed → executing → live → reviewed
+    ↑ ↓           ↓
+  amend       abandoned
               ↓
           abandoned
 ```
 
-- **`proposed`** &mdash; `ad-agent propose` was run; nothing has happened in Ads Manager yet.
+- **`proposed`** &mdash; `ad-agent propose` was run; nothing has happened in Ads Manager yet. A
+  proposal can still be corrected at this stage with `ad-agent amend`, which appends an `## Amendment`
+  section recording what moved and why rather than quietly overwriting the record. Once it's `live`,
+  it can't be &mdash; the record has to keep saying what was actually built.
 - **`live`** &mdash; `ad-agent log-setup` recorded the real IDs after a person set the ad up by hand.
   The `ad_set_id` recorded here is deliberately the same join key `pocket-dating-coach`'s own analytics
   uses internally (`${network}:${adSetId}`), so `ad-audit` can look up real performance without anyone

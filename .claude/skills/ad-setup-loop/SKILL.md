@@ -23,6 +23,13 @@ These are the actual product rules, and they may have been refined since you las
   backend-vs-copy distinction.
 - `rules/creative-style.md` — tone of voice, taglines, quotable first-party stats, visual identity,
   competitive landscape.
+- `rules/creative-generation.md` — how an asset actually gets produced: the POV rule, the Grok Imagine
+  prompt skeleton, the standing negative list, the plate/type split, and the QA gate every asset passes
+  before it can be referenced by a proposal.
+- `rules/destinations.yaml` — the registry of landing pages and whose point of view each one's copy
+  occupies. **This one is enforced in code:** `ad-agent propose` refuses to write a record whose ad-set
+  audience doesn't match its destination's framing, and there is no override flag. Read it before
+  promising the user an ad set can launch.
 - `rules/naming.md` — the exact campaign/ad-set/ad naming convention. A name that doesn't match this
   breaks the spend/traffic join in `pocket-dating-coach`'s own analytics later — this is not cosmetic.
 - `rules/budget.md` — the operating envelope, minimum viable daily spend, and the kill/double rule.
@@ -47,7 +54,14 @@ depend on that file being current.
    goes into the brief.
 4. **Decide the creative** — which existing asset under `creatives/` to use, or a brief for a new one to
    commission, following `rules/creative-style.md`'s tone, taglines, and visual identity. If it's a new
-   asset, note that mode 8 (`ad-intake`) or a fresh export is how it eventually lands in `creatives/`.
+   asset, produce the Grok Imagine prompt pack per `rules/creative-generation.md` and take it through
+   that file's §10 QA gate before referencing it here — nothing reaches `propose` without a recorded
+   `pass`.
+4b. **Check the destination before you write a brief around it.** Name the landing URL this ad set will
+   send traffic to and look it up in `rules/destinations.yaml`. If its `audience` doesn't match the ad
+   set's gender, or `paid_traffic` is false, or the page isn't registered at all, `propose` will refuse
+   the record — so surface that to the user *now*, not after the brief is written. Unblocking means
+   building the page and registering it; there is no flag that skips this.
 5. **State a budget cap and duration**, per `rules/budget.md` — never omit this. Default to the
    ₹800–1,200/day minimum viable range unless there's a specific reason to go higher or lower; say the
    reason if you deviate.
@@ -63,6 +77,7 @@ depend on that file being current.
      --network snap|meta \
      --campaign-name "..." --ad-set-name "..." --ad-name "..." \
      --targeting-summary "..." --creative-ref "creatives/<path-or-id>" \
+     --destination-url "https://www.riteangle.dating/<page>" \
      --budget-cap <INR/day> --duration-days <n> \
      --brief /tmp/brief.md
    ```
@@ -97,6 +112,19 @@ confirm `pocket-dating-coach`'s `user_acquisition` rows for this network since l
 been checked once against live data — an id logged without a verified live check is exactly the gap
 that let the 2026-08-21 incident run for a full week undetected. If the check shows the default is
 firing, tell the user immediately and treat it as a live incident, not a note for the next `ad-audit`.
+
+If the proposal needs correcting before it's executed — a name that doesn't parse against
+`rules/naming.md`, a creative ref pointing at the wrong folder, a budget the user revised — amend it
+rather than hand-editing the record, so the change is recorded instead of silently overwriting what was
+proposed:
+
+```
+ad-agent amend <rec_id> --reason "why" [--ad-name "..."] [--creative-ref "..."] [...]
+```
+
+Only works while the record is still `proposed`. Once it's `live`, a difference between brief and
+reality is a `log-setup --deviated` note, not an amendment — the record has to keep saying what was
+actually built. Amending `--ad-set-name` or `--destination-url` re-runs the destination gate.
 
 If the user decides not to execute a proposal at all, close it out explicitly rather than leaving it to
 rot as `proposed` forever:

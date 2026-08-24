@@ -4,7 +4,7 @@ network: snap
 status: proposed
 campaign_name: RA_TRAFFIC_GET_IN_PAN_TOF_202608
 ad_set_name: WOMEN_18-22_CASUAL_LPV
-ad_name: STORY_ATTENTION-SEEKERS_A_20260821
+ad_name: STORY_FOURTEEN-SUITORS_A_20260824
 campaign_id: null
 ad_set_id: null
 ad_id: null
@@ -14,10 +14,12 @@ targeting_summary: 'Snapchat, women only, 18-22, pan-India, Android-weighted. CA
   not narrowed further. Pan-India rather than BLR-first as a stated deviation (targeting.md''s
   broader-audiences-win note for LPV objectives; BLR-narrow women''s set underperformed).
   Success metric: landing-page views, not signups.'
-creative_ref: creatives/story-attention-seekers-a
+creative_ref: creatives/fourteen-suitors-w1822
+destination_url: https://www.riteangle.dating/get
 budget_cap_inr_per_day: 1000.0
 duration_days: 5
 created: '2026-08-21'
+amended: '2026-08-24'
 ---
 
 ## Brief (proposed)
@@ -153,3 +155,9 @@ attribution break hiding real signups. **This ad set cannot distinguish between 
 `snapchat`→`snap` / `ig`→`meta` label join in `pocket-dating-coach` is what makes the difference
 legible, and it should be treated as a prerequisite for any *scaling* decision that follows this test —
 though not for running the test itself, since landing-page views are measured upstream of the break.
+
+## Amendment (2026-08-24)
+
+- Reason: Hook slug ATTENTION-SEEKERS is not in creative-style.md's ad-ready-threads vocabulary, which naming.md requires [HOOK] to draw from; the real hook is the flood. Repointing creative_ref at the prompt pack written 2026-08-24.
+- `ad_name`: 'STORY_ATTENTION-SEEKERS_A_20260821' → 'STORY_FOURTEEN-SUITORS_A_20260824'
+- `creative_ref`: 'creatives/story-attention-seekers-a' → 'creatives/fourteen-suitors-w1822'

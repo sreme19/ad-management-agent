@@ -1,6 +1,6 @@
 # The rules
 
-Every skill reads six files under `rules/` live, every time &mdash; never from memory, and never
+Every skill reads eight files under `rules/` live, every time &mdash; never from memory, and never
 restated inside a skill file. If a rule gets refined mid-conversation, the skill edits the file in place
 in the same turn; these are living documents, not a snapshot taken once and reused forever. This mirrors
 `job-hunt-agent`'s own pattern (its `research.py` fit filter and `draft.py` style rules work the same
@@ -15,11 +15,13 @@ flowchart TB
     Naming["rules/naming.md\ncampaign/ad-set/ad naming,\nalready in production use"]
     Budget["rules/budget.md\noperating envelope,\nkill/double rule"]
     Tracking["rules/tracking.md\nUTM scheme, pre-/post-launch\nverification checklist"]
+    Generation["rules/creative-generation.md\nPOV rule, Grok prompt skeleton,\nnegative list, QA gate"]
+    Destinations["rules/destinations.yaml\nwhose POV each landing page\noccupies — enforced in code"]
 
-    Setup["ad-setup-loop"] --> Compliance & Targeting & Creative & Naming & Budget & Tracking
+    Setup["ad-setup-loop"] --> Compliance & Targeting & Creative & Generation & Destinations & Naming & Budget & Tracking
     Audit["ad-audit"] --> Budget
     Ideation["ad-ideation"] --> Compliance & Targeting & Creative & Budget
-    Intake["ad-intake"] --> Compliance & Creative
+    Intake["ad-intake"] --> Compliance & Creative & Generation
 ```
 
 ## `rules/compliance.md` &mdash; the one file every finished draft is checked against
@@ -65,6 +67,52 @@ as small in a way a rate doesn't. The visual identity is deliberately light (bra
 in a category where every rival ships a dark UI, using **Gabarito** throughout and the lowercase
 wordmark **"riteangle."** This file also holds the competitive-landscape notes `ad-ideation` and
 `ad-intake` both research against.
+
+## `rules/creative-generation.md` &mdash; how an asset actually gets made
+
+Added 2026-08-24, after the first live lead campaigns returned **98% male lead-form submissions and
+100% male `/get` store taps**. The diagnosis was that this is decided at generation time, not at
+targeting time, so the fix had to be a rule about how creative is produced.
+
+The load-bearing one is the **POV rule**: *the person an ad is targeting is the person whose point of
+view the frame occupies &mdash; never the thing being looked at.* Three of the first four live ads put a
+woman in the frame as its object, and an ad that shows a desirable woman recruits men whatever the ad
+set's gender setting says. So women's creative gets no woman as the object of the frame at all; it
+occupies her point of view instead. The same rule applies symmetrically to men's creative &mdash; a
+woman shown as the reward is the same giver/receiver framing `compliance.md` forbids, just pointed the
+other way.
+
+The rest is production discipline. **Generate the plate, never the typography** &mdash; image models
+garble text, the lowercase `riteangle` wordmark in Gabarito is a brand mark that can't be left to a
+sampler, and a plate with no text baked in can be re-cut for a new hook without regenerating the image.
+The **standing negative list** names signifiers rather than concepts (no gowns, ballrooms, marble,
+chandeliers, luxury cars, nobody kneeling or serving), because a generator can act on those and can't
+act on "no provider framing." And Grok is explicitly **the wrong tool for some assets**: where the
+creative *is* the product's interface, it's briefed from the existing renders in Figma instead.
+
+Every generated asset then passes a **QA gate** &mdash; checked as an image, not as copy &mdash; with a
+verdict of `pass`, `regenerate` (naming the prompt clause to change), or `escalate` (a compliance hit,
+which is the app owner's decision). Per `compliance.md`, that check is a separate pass from the one that
+wrote the prompt.
+
+## `rules/destinations.yaml` &mdash; the one rule file the code enforces itself
+
+Every other file under `rules/` is read by a skill and applied with judgment. This one backs a **hard
+gate in the CLI**: `ad-agent propose` refuses to write a record whose ad-set audience doesn't match the
+framing of the page it sends traffic to.
+
+It exists because of the second half of the same finding. Riteangle's `/get` landing page is written in
+the second person to a man throughout &mdash; *"She asked how you spend your weekends," "then she sees
+you," "never a ranking against men he cannot see."* She is third person on every line. A woman who taps
+a women's ad lands on a page explaining how a man gets in front of her, which is a complete explanation
+for 100% of store taps being male. There is no public women's page to send her to instead: the women's
+invite flow is token-gated and can't receive paid traffic at all.
+
+The registry records, per page, whose point of view its copy occupies, whether it can take paid traffic,
+and the date someone actually read it to classify it. **There is deliberately no override flag**, and
+`ad-agent amend` can't launder one either &mdash; a blocked proposal is unblocked by building the page
+and registering it. Unregistered pages fail closed rather than being assumed safe, the same way
+`tracking.md`'s parsing does.
 
 ## `rules/naming.md` &mdash; the convention every recommendation must match exactly
 
