@@ -37,6 +37,20 @@ destinations:
       Needs either a women's variant switched off a UTM param, or a separate
       public route, before any women-targeted ad set can point at it.
 
+  /get/w:
+    audience: women
+    paid_traffic: false
+    verified: 2026-08-25
+    note: >-
+      The women's variant of /get, built 2026-08-25. Same route file, audience
+      switched off the path segment; her page leads with the ordered list and
+      carries the vetting second, and verification is framed as something she
+      receives rather than performs. Copy verified by reading the rendered page.
+      paid_traffic is false ONLY because it is not deployed yet — riteangle.dating
+      /get/w still 404s. Flip this to true once it is live and the tracking.md
+      pre-launch check has been run against the real URL. That one-word change is
+      what unblocks rec-2026-08-21-women-1822-casual-lpv.
+
   /beta:
     audience: women
     paid_traffic: false
