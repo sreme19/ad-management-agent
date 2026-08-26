@@ -1,13 +1,13 @@
 ---
 rec_id: rec-2026-08-21-women-1822-casual-lpv
 network: snap
-status: proposed
+status: live
 campaign_name: RA_TRAFFIC_GET_IN_PAN_TOF_202608
 ad_set_name: WOMEN_18-22_CASUAL_LPV
 ad_name: STORY_FOURTEEN-SUITORS_A_20260824
-campaign_id: null
-ad_set_id: null
-ad_id: null
+campaign_id: 6f8c30ab-ad74-4525-b441-f18ced852515
+ad_set_id: 1b993192-30b9-47e5-9e1a-cd0f11607292
+ad_id: 7f2b4ccc-a150-480d-9230-3bdc48ea9bfb
 targeting_summary: 'Snapchat, women only, 18-22, pan-India, Android-weighted. CASUAL-SELECTIVE
   persona at the 18-22 treatment: wild-experiences/social-energy register, feminist-coded
   hook. Interests: Dating & Relationships, Travel, Lifestyle, Nightlife - deliberately
@@ -20,6 +20,7 @@ budget_cap_inr_per_day: 1000.0
 duration_days: 5
 created: '2026-08-21'
 amended: '2026-08-26'
+executed: '2026-08-26'
 ---
 
 ## Brief (proposed)
@@ -166,3 +167,11 @@ though not for running the test itself, since landing-page views are measured up
 
 - Reason: The women's destination now exists and is verified. /get/w deployed 2026-08-25, beacon endpoints fixed 2026-08-26 (pocket-dating-coach e9b45a83), tracking.md pre-launch checks passed against the live URL.
 - `destination_url`: 'https://www.riteangle.dating/get' → 'https://www.riteangle.dating/get/w'
+
+## Execution
+
+- Date: 2026-08-26
+- Campaign ID: 6f8c30ab-ad74-4525-b441-f18ced852515
+- Ad set ID: 1b993192-30b9-47e5-9e1a-cd0f11607292
+- Ad ID: 7f2b4ccc-a150-480d-9230-3bdc48ea9bfb
+- Deviated from brief: Effective daily spend is Rs 300, not the Rs 1,000 proposed. The ad squad carries Rs 1,000/day but a campaign-level Daily spend cap of Rs 300 was set before launch and the lower figure binds. That is below rules/budget.md's Rs 800-1,200 minimum viable floor, so the delivery algorithm may not exit its learning phase. Treat a weak read as inconclusive rather than as evidence against this audience: the predecessor Female 18-22-LPV holds the account's best tap rate (20.9%, n=110) and was starved at ~Rs 44/day, which is the exact failure this recommendation was written to correct. Raising or clearing the campaign cap is what makes the result readable. Also created via ad-agent snap-push rather than by hand — first API-created ad set in this ledger.
