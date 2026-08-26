@@ -199,3 +199,13 @@ So conforming to the naming and tracking rules broke the audience cut, and every
 Right fix: audienceOf() should classify on the resolved ad-set name rather than the raw row. The analytics already recovers that name — the leaderboard displays WOMEN_18-22_CASUAL_LPV correctly for these very rows — so the information is present, just not where the classifier looks. Quick alternative: carry the ad-set name in utm_content alongside the ad name, which costs nothing on Snap where utm_id is the join, but changes what utm_content means on Meta.
 
 Practical effect meanwhile: any men-vs-women split in ad-audit is blind to this ad set. Read it by ad-set id, not by audience filter.
+
+## Note — observation (2026-08-26)
+
+Campaign paused at the app owner's request at the end of day 1, 2026-08-26. Final for the day: Rs 351.85 spent (against a Rs 300 cap — Snap overdelivered by 17%), 54,483 impressions to 6,685 uniques at 8.1x frequency, 172 swipes, 96 landing-page views on our own count and 59 on Snap's, 2 store taps.
+
+Ad squad and ad keep status ACTIVE with delivery INVALID_NOT_EFFECTIVE_ACTIVE, so resuming is one switch at campaign level rather than three.
+
+Day 1 is not a readable result and should not be pooled with whatever follows. It was one 90-minute burst in a single evening window, in learning phase throughout, at a third of budget.md's floor, with the same 6,685 people seeing the ad eight times each. Tap rate of 2 in 96 has a confidence interval wide enough to contain almost anything.
+
+The open question for day 2: the 20.9% benchmark this recommendation was built on belongs to Female 18-22-LPV, which pointed at /get — the men's page. This ad set points at /get/w and sits at 2.1%. That is the opposite of the hypothesis. At n=2 it means nothing, but it is the specific thing a day at Rs 1,000 would settle: roughly 275 views/day makes 2% and 20% distinguishable at a glance (6 taps versus 57).

@@ -221,6 +221,47 @@ class SnapClient:
         }]})
         return self._one(res, "campaigns")
 
+    # ---- stopping spend --------------------------------------------------
+    def pause_campaign(self, campaign_id: str) -> dict:
+        """Set a live campaign to PAUSED, stopping everything beneath it.
+
+        This is the ONE state change this module makes, and the asymmetry is the
+        point: it can stop money, and it can never start it. There is still no
+        resume, enable or activate anywhere here, so the worst this method can do
+        is halt spend that a human chose to begin. Restarting remains a human
+        action in Ads Manager, exactly as SPEC.md decision #3 requires.
+
+        Reads back and refuses to claim success on the API's say-so.
+        """
+        current = self.get(f"/campaigns/{campaign_id}")["campaigns"][0]["campaign"]
+        # Snap's update is a full replace, not a patch: omitting a required field
+        # fails the item while the HTTP call still returns 200. Echo the current
+        # values back and change only status. _one() raises on the per-item error
+        # that a bare 200 would otherwise hide.
+        body = {
+            "id": campaign_id,
+            "ad_account_id": self.cfg["ad_account_id"],
+            "name": current["name"],
+            "start_time": current["start_time"],
+            "buy_model": current.get("buy_model", "AUCTION"),
+            "status": "PAUSED",
+        }
+        # Deliberately NOT echoing daily_budget_micro. It is not required for this
+        # update, and sending it would trip the paused-only guard in _call() — the
+        # guard is right: a pause has no business carrying a budget field at all.
+        for k in ("end_time", "objective_v2_properties"):
+            if current.get(k) is not None:
+                body[k] = current[k]
+        self._one(self.put(f"/adaccounts/{self.cfg['ad_account_id']}/campaigns",
+                           {"campaigns": [body]}), "campaigns")
+        after = self.get(f"/campaigns/{campaign_id}")["campaigns"][0]["campaign"]
+        if after.get("status") != "PAUSED":
+            raise SnapError(
+                f"asked Snap to pause {current['name']} but it still reads "
+                f"{after.get('status')!r}. Pause it by hand in Ads Manager."
+            )
+        return after
+
     # ---- ad squad --------------------------------------------------------
     def create_adsquad(self, *, name, campaign_id, targeting, daily_budget_inr,
                        start_time, end_time, pixel_id) -> dict:
