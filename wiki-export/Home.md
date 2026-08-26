@@ -34,18 +34,30 @@ flowchart LR
         A2{"working / not-working /\ninconclusive?"}
     end
 
+    subgraph Learn["What we believe, and why"]
+        R1[("Notes, learnings, open questions\nresearch/")]
+    end
+
+    R1 --> I1
     I1 -->|"recommend"| S1
     I2 -->|"recommend"| S1
     S1 --> L1
     L1 --> S2
     S2 -->|"log the real IDs"| L1
     L1 --> A1 --> A2
-    A2 -.->|"feeds the next round"| I1
+    A2 -.->|"the verdict corrects\nthe belief behind it"| R1
 ```
 
-Nothing in this loop ever touches a live Meta or Snap account. The only step that reaches the outside
-world &mdash; creating or changing anything in Ads Manager &mdash; is done by a person, every single
-time.
+The dotted edge at the bottom is the one that makes this a loop rather than a pile: a verdict does not
+just close a record, it goes back and marks the belief that produced the recommendation as supported or
+contradicted. See [The research loop](The-research-loop).
+
+**Nothing in this loop can start spending money.** On Snap the system may create a campaign, ad squad
+and ad for you, but only ever `PAUSED`, and it reads every object back to check it matches the plan.
+On Meta it touches nothing at all and holds no credential. The step that starts the spend &mdash;
+enabling an ad set, or raising the budget of one already live &mdash; is done by a person, every single
+time, and is refused in code rather than merely discouraged. See
+[Why it's built this way](Safety-and-guardrails).
 
 ## Read next
 

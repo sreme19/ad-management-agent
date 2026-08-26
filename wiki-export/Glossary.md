@@ -83,3 +83,42 @@ A path or id under `creatives/` naming which asset a recommendation uses, passed
 **`INDEX.md`**
 The generated, at-a-glance rollup of every ledger record at the repo root. Never hand-edited — every
 mutating `ad-agent` command regenerates it from scratch.
+
+**Learning**
+One claim, in one file under `research/learnings/`, carrying where it came from (`source`) and how
+sure we are (`confidence`). Evidence and hypotheses only — a learning never constrains anything. See
+[The research loop](The-research-loop).
+
+**Note (research)**
+Raw material someone brought in, stored **verbatim and never edited**, under `research/notes/`. The
+content is the provenance a learning points back at, which is why it cannot be rewritten. Not the same
+thing as `ad-agent note`, which appends a dated line to a *ledger record* while a campaign is running.
+
+**Source kind**
+Where a claim came from: `live-data`, `platform-doc`, `source-code`, `own-research`,
+`competitor-observation`, `intuition`. Only the first three may be marked `high` confidence —
+everything else is a hypothesis, however plausible.
+
+**`MIN_SAMPLE`**
+The floor of 30, inherited from `pocket-dating-coach`'s own `ad-analytics.ts`. Below it, a claim about
+live performance is `inconclusive`, never a finding. Applies to `ad-audit`'s verdicts and to any
+`live-data` learning.
+
+**Back-edge**
+The step where a campaign's verdict travels back to the belief that produced the recommendation and
+marks it supported, contradicted or mixed — and onto the creative's `prompts.md`. Run automatically by
+`ad-agent log-review`. Without it the research library only grows and never corrects itself.
+
+**Idea**
+A proposal-shaped hypothesis under `ideas/`, carrying a `recommend`/`hold` verdict and the spend it
+would take to test. A `hold` must state what would change the verdict, or it is indistinguishable from
+a no.
+
+**Promotion**
+A human deciding a learning is reliable enough to become a rule, editing the relevant `rules/` file and
+recording it with `ad-agent promote`. The only route by which research becomes binding.
+
+**Loose end**
+Anything the loop started and did not finish: a proposal never executed, a live ad set past its review
+window, a note nobody derived anything from, a recommended idea nobody proposed. `ad-agent open` lists
+them all, derived fresh every run.
