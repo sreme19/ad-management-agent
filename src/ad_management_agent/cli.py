@@ -16,7 +16,7 @@ import urllib.request
 from pathlib import Path
 
 from . import budget as budgetrules
-from . import destinations, snap as snapapi, targeting as targetingspec
+from . import destinations, research as researchmod, snap as snapapi, targeting as targetingspec
 from .config import load_config
 from .ledger import STATUSES, Ledger
 
@@ -122,6 +122,18 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
         today=_today(),
     )
     ledger.write_index()
+
+    # Close the idea, so an approved idea that became a real record stops being
+    # reported as one nobody acted on.
+    if args.from_idea:
+        try:
+            _research(ledger).mark_idea_proposed(args.from_idea, rec_id=rec.rec_id, today=_today())
+        except (researchmod.ResearchError, KeyError) as exc:
+            print(f"warning: proposal written, but {args.from_idea} was not closed: {exc}",
+                  file=sys.stderr)
+        else:
+            print(f"closed idea {args.from_idea}")
+
     print(f"proposed {rec.rec_id} -> {rec.path}")
 
 
@@ -530,6 +542,120 @@ def cmd_dump_ledger(args: argparse.Namespace, ledger: Ledger) -> None:
     print(text)
 
 
+def _research(ledger: Ledger) -> researchmod.Research:
+    return researchmod.Research(ledger.root)
+
+
+def _research_fail(exc: Exception) -> None:
+    print(f"error: {exc}", file=sys.stderr)
+    raise SystemExit(2) from exc
+
+
+def cmd_ingest(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Store a note exactly as it was brought in. Never edited afterwards."""
+    text = Path(args.file).read_text(encoding="utf-8") if args.file else (args.text or "")
+    try:
+        rec = _research(ledger).ingest(title=args.title, text=text, source=args.source,
+                                       slug=args.slug, today=_today())
+    except (researchmod.ResearchError, OSError) as exc:
+        _research_fail(exc)
+    print(f"ingested {rec.front_matter['id']} -> {rec.path}")
+    print("Nothing has been learned from it yet. Derive the claims with `ad-agent learn "
+          f"--derived-from {rec.front_matter['id']} ...` — an ingested note with no learnings "
+          "is an open loose end, and `ad-agent open` will keep saying so.")
+
+
+def cmd_learn(args: argparse.Namespace, ledger: Ledger) -> None:
+    r = _research(ledger)
+    # Surface neighbours before writing. The CLI cannot judge whether two claims
+    # are the same, but it can put them in front of whoever can.
+    siblings = [x for x in r.learnings()
+                if x.front_matter.get("subject") == args.subject
+                and x.front_matter.get("status") not in ("retired",)]
+    try:
+        rec = r.learn(
+            claim=args.claim, subject=args.subject, source=args.source,
+            confidence=args.confidence, sample_n=args.sample_n, evidence=args.evidence,
+            derived_from=args.derived_from, answers=args.answers, slug=args.slug,
+            today=_today(),
+        )
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    print(f"learned {rec.front_matter['id']} -> {rec.path}")
+    if siblings:
+        print(f"\n{len(siblings)} existing learning(s) on `{args.subject}` — if this restates one "
+              "of them,\nthat is `log-evidence` on the original, not a second atom:")
+        for x in siblings[:8]:
+            fm = x.front_matter
+            print(f"  {fm['id']}  [{fm.get('confidence')}/{fm.get('status')}] {fm.get('claim')}")
+
+
+def cmd_log_evidence(args: argparse.Namespace, ledger: Ledger) -> None:
+    try:
+        rec = _research(ledger).log_evidence(args.learning_id, outcome=args.outcome,
+                                             text=args.text, from_ref=args.from_ref,
+                                             today=_today())
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    print(f"{rec.front_matter['id']} -> status={rec.front_matter['status']}")
+
+
+def cmd_promote(args: argparse.Namespace, ledger: Ledger) -> None:
+    try:
+        rec = _research(ledger).promote(args.learning_id, rule_file=args.rule, today=_today())
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    print(f"promoted {rec.front_matter['id']} into {args.rule}")
+    print("Remember the edit itself: this records that the rule now carries the claim, it does "
+          "not write it. rules/ is what skills obey.")
+
+
+def cmd_retire(args: argparse.Namespace, ledger: Ledger) -> None:
+    try:
+        rec = _research(ledger).retire(args.learning_id, reason=args.reason, today=_today())
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    print(f"retired {rec.front_matter['id']}")
+
+
+def cmd_question(args: argparse.Namespace, ledger: Ledger) -> None:
+    try:
+        rec = _research(ledger).question(text=args.text, kind=args.kind, why=args.why,
+                                         raised_by=args.raised_by, slug=args.slug,
+                                         today=_today())
+    except researchmod.ResearchError as exc:
+        _research_fail(exc)
+    print(f"asked {rec.front_matter['id']} -> {rec.path}")
+
+
+def cmd_answer(args: argparse.Namespace, ledger: Ledger) -> None:
+    try:
+        rec = _research(ledger).answer(args.question_id, text=args.text, learning=args.learning,
+                                       dropped=args.dropped, today=_today())
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    print(f"{rec.front_matter['id']} -> {rec.front_matter['status']}")
+
+
+def cmd_idea(args: argparse.Namespace, ledger: Ledger) -> None:
+    if budgetrules.below_floor(args.est_daily):
+        print(f"note: {budgetrules.floor_note(args.est_daily)}\n"
+              "      An idea costed below the floor is proposing a system check, not a test.",
+              file=sys.stderr)
+    try:
+        rec = _research(ledger).idea(
+            title=args.title, verdict=args.verdict, network=args.network, persona=args.persona,
+            est_daily_inr=args.est_daily, est_days=args.est_days, rationale=args.rationale,
+            learnings=args.learning or [], blocked_on=args.blocked_on, slug=args.slug,
+            today=_today(),
+        )
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    fm = rec.front_matter
+    print(f"{fm['verdict']} {fm['id']} -> {rec.path}  "
+          f"(Rs {fm['est_daily_inr']:.0f}/day x {fm['est_days']}d = Rs {fm['est_total_inr']:.0f})")
+
+
 def _age_days(today: _dt.date, when) -> int | None:
     try:
         return (today - _dt.date.fromisoformat(str(when))).days
@@ -662,6 +788,86 @@ def cmd_open(args: argparse.Namespace, ledger: Ledger) -> None:
     if no_backedge:
         sections.append(("Verdict never written back to the prompt library", no_backedge))
 
+    # --- the research loop ---
+    r = _research(ledger)
+
+    rows = []
+    for q in sorted(r.questions(), key=lambda x: str(x.front_matter.get("asked"))):
+        fm = q.front_matter
+        if fm.get("status") != "open":
+            continue
+        age = _age_days(today, fm.get("asked"))
+        rows.append(f"{fm['id']}  [{fm.get('kind')}] asked {age}d ago  -> research it, "
+                    f"then `answer` it")
+    if rows:
+        sections.append(("Open research questions", rows))
+
+    rows = [f"{n.front_matter['id']}  ingested "
+            f"{_age_days(today, n.front_matter.get('captured'))}d ago, nothing derived  "
+            f"-> learn --derived-from {n.front_matter['id']}"
+            for n in r.notes() if not n.front_matter.get("learnings")]
+    if rows:
+        # An ingested note nobody derived anything from is the research loop's own
+        # version of a proposal never executed.
+        sections.append(("Notes ingested, no learning derived", rows))
+
+    stale, untested = [], []
+    for lrn in r.learnings():
+        fm = lrn.front_matter
+        if fm.get("status") in ("retired", "promoted"):
+            continue
+        due = _age_days(today, fm.get("review_after"))
+        if due is not None and due >= 0:
+            last = _age_days(today, fm.get("last_confirmed"))
+            stale.append(f"{fm['id']}  [{fm.get('source')}] last confirmed {last}d ago  "
+                         f"-> reconfirm or retire")
+        elif fm.get("status") == "open" and (_age_days(today, fm.get("created")) or 0) >= 14:
+            # A grace period, so a claim recorded this week is not nagged about as
+            # though it had been sitting untested for months. After two weeks, a
+            # hypothesis nobody has designed a test for is a real loose end.
+            untested.append(f"{fm['id']}  [{fm.get('confidence')}/{fm.get('source')}] "
+                            f"{str(fm.get('claim'))[:70]}  -> never tested")
+    if stale:
+        sections.append(("Learnings past their review date", stale))
+    if untested:
+        sections.append(("Learnings never tested against a real outcome", untested))
+
+    rows = []
+    for idea in r.ideas():
+        fm = idea.front_matter
+        if fm.get("status") != "open":
+            continue
+        age = _age_days(today, fm.get("created"))
+        if fm.get("verdict") == "recommend":
+            rows.append(f"{fm['id']}  recommended {age}d ago, Rs {fm.get('est_total_inr'):.0f}  "
+                        f"-> propose --from-idea {fm['id']}, or drop it")
+    if rows:
+        sections.append(("Ideas recommended but never proposed", rows))
+
+    # A claim that turned out wrong is only half the problem; what still leans on it
+    # is the other half. Anything citing it needs revisiting, and a contradicted claim
+    # sitting in a rules file is the worst state in the system, because rules/ wins.
+    cited: dict[str, list[str]] = {}
+    for idea in r.ideas():
+        for ref in idea.front_matter.get("learnings") or []:
+            cited.setdefault(ref, []).append(idea.front_matter["id"])
+    promoted, plain = [], []
+    for lrn in r.learnings():
+        fm = lrn.front_matter
+        if fm.get("status") not in ("contradicted", "mixed"):
+            continue
+        leans = (fm.get("recs") or []) + cited.get(fm["id"], [])
+        tail = f"  still cited by {', '.join(leans)}" if leans else ""
+        if fm.get("promoted_to"):
+            promoted.append(f"{fm['id']}  {fm['status']}, but still normative in "
+                            f"{fm['promoted_to']}{tail}  -> fix the rule or retire the claim")
+        else:
+            plain.append(f"{fm['id']}  {fm['status']}{tail}  -> revise, retire, or narrow it")
+    if promoted:
+        sections.append(("Promoted rules whose evidence has since been contradicted", promoted))
+    if plain:
+        sections.append(("Learnings contradicted by a real outcome", plain))
+
     # --- report ---
     if sections:
         for title, rows in sections:
@@ -674,13 +880,14 @@ def cmd_open(args: argparse.Namespace, ledger: Ledger) -> None:
 
     # Absence of a section is not evidence of nothing to do — say what this command
     # cannot yet see, so a quiet report is not mistaken for a finished loop.
-    unwired = [name for name, sub in (("research questions", "research"),
-                                      ("learnings", "research"),
-                                      ("ideas", "ideas")) if not (root / sub).exists()]
-    if unwired:
-        print("Not wired yet, so not counted above: " + ", ".join(sorted(set(unwired))) + ".")
-        print("Those loops have no store in this repo yet — an empty report above does not")
-        print("mean there is nothing outstanding in them.")
+    empty = [label for label, store in (("questions", r.questions_dir),
+                                        ("notes", r.notes_dir),
+                                        ("learnings", r.learnings_dir),
+                                        ("ideas", r.ideas_dir)) if not store.exists()]
+    if empty:
+        print("No store yet for: " + ", ".join(empty) + ".")
+        print("Nothing has been written to them, so an empty report above is not evidence")
+        print("that there is nothing outstanding — only that nobody has recorded it here.")
 
 
 COMMANDS_BEGIN = "<!-- BEGIN GENERATED: ad-agent commands -->"
@@ -827,6 +1034,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--budget-cap", required=True, type=float, help="INR per day")
     sp.add_argument("--duration-days", required=True, type=int)
     sp.add_argument("--brief", required=True, help="path to a markdown brief file")
+    sp.add_argument("--from-idea", default=None,
+                    help="idea id this came from; marks that idea proposed so it stops "
+                         "showing as an open loose end")
     _add_targeting_flags(sp, required=True)
     sp.set_defaults(func=cmd_propose)
 
@@ -903,6 +1113,102 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("dump-ledger", help="Print the ledger index")
     sp.add_argument("--status", default=None, choices=list(STATUSES))
     sp.set_defaults(func=cmd_dump_ledger)
+
+    # ---- the research loop -------------------------------------------------
+    sp = sub.add_parser(
+        "ingest",
+        help="Store a note you brought in, verbatim and immutable, as provenance for learnings",
+    )
+    sp.add_argument("--title", required=True, help="what this note is about")
+    sp.add_argument("--source", required=True, choices=list(researchmod.SOURCES))
+    g = sp.add_mutually_exclusive_group(required=True)
+    g.add_argument("--file", default=None, help="path to the note")
+    g.add_argument("--text", default=None, help="the note itself")
+    sp.add_argument("--slug", default=None,
+                    help="short id suffix; defaults to the first few words")
+    sp.set_defaults(func=cmd_ingest)
+
+    sp = sub.add_parser(
+        "learn",
+        help="Record one derived claim, with the source kind and confidence that make it citable",
+    )
+    sp.add_argument("--claim", required=True, help="one claim, stated plainly")
+    sp.add_argument("--subject", required=True, choices=list(researchmod.SUBJECTS))
+    sp.add_argument("--source", required=True, choices=list(researchmod.SOURCES),
+                    help="only live-data and platform-doc may be `high` confidence")
+    sp.add_argument("--confidence", required=True, choices=list(researchmod.CONFIDENCES))
+    sp.add_argument("--sample-n", default=None, type=int,
+                    help=f"required for live-data; below MIN_SAMPLE={researchmod.MIN_SAMPLE} "
+                         "the claim can only be `low`")
+    sp.add_argument("--evidence", required=True, help="what actually supports this, today")
+    sp.add_argument("--derived-from", default=None, help="the note id this was derived from")
+    sp.add_argument("--answers", default=None, help="question id this claim closes")
+    sp.add_argument("--slug", default=None,
+                    help="short id suffix; defaults to the first few words")
+    sp.set_defaults(func=cmd_learn)
+
+    sp = sub.add_parser(
+        "log-evidence",
+        help="Attach a dated outcome to a learning — the back-edge that lets it be corrected",
+    )
+    sp.add_argument("learning_id")
+    sp.add_argument("--outcome", required=True, choices=list(researchmod.OUTCOMES))
+    sp.add_argument("--text", required=True)
+    sp.add_argument("--from", dest="from_ref", default=None,
+                    help="rec_id whose verdict produced this, if any")
+    sp.set_defaults(func=cmd_log_evidence)
+
+    sp = sub.add_parser(
+        "promote",
+        help="Record that a learning has graduated into a rules file and is now normative",
+    )
+    sp.add_argument("learning_id")
+    sp.add_argument("--rule", required=True, help="e.g. rules/targeting.md")
+    sp.set_defaults(func=cmd_promote)
+
+    sp = sub.add_parser("retire", help="Close out a learning that is no longer worth carrying")
+    sp.add_argument("learning_id")
+    sp.add_argument("--reason", required=True)
+    sp.set_defaults(func=cmd_retire)
+
+    sp = sub.add_parser(
+        "question",
+        help="Add an open research question to the queue that drives the next research pass",
+    )
+    sp.add_argument("--text", required=True)
+    sp.add_argument("--kind", required=True, choices=list(researchmod.SUBJECTS))
+    sp.add_argument("--why", required=True, help="why it matters — what decision it unblocks")
+    sp.add_argument("--raised-by", default=None, help="rec_id, learning id or idea id, if any")
+    sp.add_argument("--slug", default=None,
+                    help="short id suffix; defaults to the first few words")
+    sp.set_defaults(func=cmd_question)
+
+    sp = sub.add_parser("answer", help="Close an open question, optionally naming what it taught")
+    sp.add_argument("question_id")
+    sp.add_argument("--text", required=True)
+    sp.add_argument("--learning", default=None, help="the learning id this produced")
+    sp.add_argument("--dropped", action="store_true",
+                    help="close it as no longer worth answering, rather than as answered")
+    sp.set_defaults(func=cmd_answer)
+
+    sp = sub.add_parser(
+        "idea",
+        help="Record a recommend/hold idea with the spend it would take to test it",
+    )
+    sp.add_argument("--title", required=True)
+    sp.add_argument("--verdict", required=True, choices=list(researchmod.IDEA_VERDICTS))
+    sp.add_argument("--network", required=True, choices=["snap", "meta"])
+    sp.add_argument("--persona", required=True, help="from rules/targeting.md")
+    sp.add_argument("--est-daily", required=True, type=float, help="INR per day to test it")
+    sp.add_argument("--est-days", required=True, type=int)
+    sp.add_argument("--rationale", required=True)
+    sp.add_argument("--learning", action="append", default=None,
+                    help="learning id this rests on; repeatable")
+    sp.add_argument("--blocked-on", default=None,
+                    help="required for a hold: what would make it recommendable")
+    sp.add_argument("--slug", default=None,
+                    help="short id suffix; defaults to the first few words")
+    sp.set_defaults(func=cmd_idea)
 
     sp = sub.add_parser(
         "open",

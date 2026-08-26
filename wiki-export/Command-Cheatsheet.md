@@ -43,6 +43,14 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 | `abandon` | Close out a recommendation that was never executed |
 | `stats` | Deterministic counts over the ledger |
 | `dump-ledger` | Print the ledger index |
+| `ingest` | Store a note you brought in, verbatim and immutable, as provenance for learnings |
+| `learn` | Record one derived claim, with the source kind and confidence that make it citable |
+| `log-evidence` | Attach a dated outcome to a learning — the back-edge that lets it be corrected |
+| `promote` | Record that a learning has graduated into a rules file and is now normative |
+| `retire` | Close out a learning that is no longer worth carrying |
+| `question` | Add an open research question to the queue that drives the next research pass |
+| `answer` | Close an open question, optionally naming what it taught |
+| `idea` | Record a recommend/hold idea with the spend it would take to test it |
 | `open` | Every loose end the ledger can see — start here when you come back to this repo |
 | `commands` | Print the command list, or regenerate it in README and the wiki cheatsheet |
 | `fetch-analytics` | Pull pocket-dating-coach's ad analytics via the authenticated internal endpoint |
@@ -50,7 +58,7 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 #### `propose`
 
 ```
-ad-agent propose [-h] --network {snap,meta} --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
+ad-agent propose [-h] --network {snap,meta} --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
 ```
 
 #### `snap-push`
@@ -99,6 +107,54 @@ ad-agent stats [-h]
 
 ```
 ad-agent dump-ledger [-h] [--status {proposed,executing,live,reviewed,abandoned}]
+```
+
+#### `ingest`
+
+```
+ad-agent ingest [-h] --title TITLE --source {live-data,platform-doc,own-research,competitor-observation,intuition} (--file FILE | --text TEXT) [--slug SLUG]
+```
+
+#### `learn`
+
+```
+ad-agent learn [-h] --claim CLAIM --subject {audience,creative,channel,tracking,competitor,product,budget} --source {live-data,platform-doc,own-research,competitor-observation,intuition} --confidence {high,medium,low} [--sample-n SAMPLE_N] --evidence EVIDENCE [--derived-from DERIVED_FROM] [--answers ANSWERS] [--slug SLUG]
+```
+
+#### `log-evidence`
+
+```
+ad-agent log-evidence [-h] --outcome {supported,contradicted,inconclusive} --text TEXT [--from FROM_REF] learning_id
+```
+
+#### `promote`
+
+```
+ad-agent promote [-h] --rule RULE learning_id
+```
+
+#### `retire`
+
+```
+ad-agent retire [-h] --reason REASON learning_id
+```
+
+#### `question`
+
+```
+ad-agent question [-h] --text TEXT --kind {audience,creative,channel,tracking,competitor,product,budget} --why WHY [--raised-by RAISED_BY] [--slug SLUG]
+```
+
+#### `answer`
+
+```
+ad-agent answer [-h] --text TEXT [--learning LEARNING] [--dropped] question_id
+```
+
+#### `idea`
+
+```
+ad-agent idea [-h] --title TITLE --verdict {recommend,hold} --network {snap,meta} --persona PERSONA --est-daily EST_DAILY --est-days EST_DAYS --rationale RATIONALE [--learning LEARNING] [--blocked-on BLOCKED_ON] [--slug SLUG]
 ```
 
 #### `open`
@@ -157,6 +213,108 @@ proposal outright:
 
 You generally won't type this by hand &mdash; `ad-setup-loop` runs it once the recommendation is ready
 and hands you the `rec_id` plainly.
+
+## The research loop
+
+Everything below writes to `research/` (notes, learnings, questions) or `ideas/` — **never to
+`rules/`**. The two are not the same kind of thing and the precedence between them is absolute:
+`rules/` is normative and always wins; research is evidence and hypotheses, and constrains nothing.
+See `research/README.md` for why that line is drawn where it is.
+
+### "I brought some notes in"
+
+```
+ad-agent ingest --title "..." --source live-data|platform-doc|own-research|competitor-observation|intuition \
+  (--text "..." | --file /tmp/notes.md) [--slug short-id]
+```
+
+Stores the note **verbatim and immutably**. It is never edited afterwards, because the content *is*
+the provenance — a claim pointing back at a note that could have been rewritten proves nothing.
+
+Ingesting is only half the job. A note with nothing derived from it is a loose end, and `ad-agent
+open` will keep saying so until you run `learn --derived-from <note-id>`.
+
+### "Here is what we learned"
+
+```
+ad-agent learn --claim "..." --subject audience|creative|channel|tracking|competitor|product|budget \
+  --source ... --confidence high|medium|low [--sample-n <n>] --evidence "..." \
+  [--derived-from <note-id>] [--answers <question-id>] [--slug short-id]
+```
+
+One claim per file. The two gates are the point of the whole store:
+
+- **`--confidence high` is refused unless the source is `live-data` or `platform-doc`.** Your own
+  reading, a competitor observation, an informed hunch — all cap at `medium`, however plausible. A
+  test earns the upgrade.
+- **A `live-data` claim must state `--sample-n`, and below `MIN_SAMPLE = 30` it can only be `low`.**
+  That is SPEC.md decision #6, inherited from `pocket-dating-coach`'s own `ad-analytics.ts`, applied
+  so a brief cannot lean on a number the dashboard itself would call inconclusive.
+
+It also prints every existing learning on the same subject. The CLI cannot judge whether two claims
+are the same; it can put them in front of whoever can. If this restates one of them, that is
+`log-evidence` on the original, not a second atom.
+
+Each learning gets a `review_after` date from its source — competitor observations 60 days, hunches
+90, own research and live data 120, platform docs 180.
+
+### "A real campaign just tested one of our beliefs"
+
+```
+ad-agent log-evidence <learning-id> --outcome supported|contradicted|inconclusive \
+  --text "..." [--from <rec_id>]
+```
+
+**The back-edge, and the most important command here.** Without it the library only ever grows and
+never corrects itself — and a store that confidently records wrong things is worse than no store.
+
+`supported` and `contradicted` move an open claim; the two arriving in either order make it `mixed`,
+not whichever came last. `inconclusive` records the evidence and leaves the status alone. `supported`
+also resets the review clock.
+
+### "That claim is now a rule" / "that claim is dead"
+
+```
+ad-agent promote <learning-id> --rule rules/targeting.md
+ad-agent retire  <learning-id> --reason "..."
+```
+
+`promote` records that a claim has graduated into a rules file and is now normative. **It does not
+write the rule** — that edit is a human decision made in the file itself; this only gives the rule a
+traceable origin and stops the learning being reported as an untested hypothesis.
+
+A promoted claim that is later contradicted is the worst state in the system, because `rules/` wins
+over research by design. `ad-agent open` reports it first.
+
+### "Nobody knows this yet"
+
+```
+ad-agent question --text "..." --kind ... --why "what decision it unblocks" [--raised-by <id>] [--slug ...]
+ad-agent answer <question-id> --text "..." [--learning <learning-id>] [--dropped]
+```
+
+The queue is what makes research a loop rather than an errand. A research pass should start by
+popping from it, not from "go look into women's ads". Every other mode fills it: an `inconclusive`
+audit verdict, an idea held pending research, an intake raising a why-does-this-work.
+
+`--dropped` closes a question as no longer worth answering, which is a different outcome from
+answering it.
+
+### "Here is something worth trying"
+
+```
+ad-agent idea --title "..." --verdict recommend|hold --network snap|meta --persona ... \
+  --est-daily <INR> --est-days <n> --rationale "..." [--learning <id>]... [--blocked-on "..."] [--slug ...]
+```
+
+`ad-ideation`'s write-back. Every idea carries the spend it would take to test it, because an idea
+with no stated cost is missing the thing you would actually decide on.
+
+**A `hold` must pass `--blocked-on`**: what would have to be true for it to become recommendable. A
+hold with no unblock condition is indistinguishable from a no, and it will sit in the queue forever.
+
+When an idea becomes real, `ad-agent propose --from-idea <idea-id>` closes it out, so an approved idea
+that got acted on stops showing as one nobody touched.
 
 ## "Create it on Snap for me" (the only live-account write)
 

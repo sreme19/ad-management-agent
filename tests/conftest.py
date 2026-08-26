@@ -21,7 +21,8 @@ REPO = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def ledger_root(tmp_path, monkeypatch) -> Path:
     (tmp_path / "rules").mkdir()
-    shutil.copy(REPO / "rules" / "destinations.yaml", tmp_path / "rules" / "destinations.yaml")
+    for name in ("destinations.yaml", "targeting.md"):
+        shutil.copy(REPO / "rules" / name, tmp_path / "rules" / name)
 
     creative = tmp_path / "creatives" / "test-asset"
     creative.mkdir(parents=True)

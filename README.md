@@ -60,6 +60,35 @@ weight instead. See `SPEC.md` decisions #3 and #10 for the full reasoning.
 If a rule gets refined mid-conversation, the skill edits the file in place — these are living
 documents, not a snapshot.
 
+## The research loop
+
+`research/` and `ideas/` hold what the agent learns; `campaigns/` holds what it does. **They are not
+`rules/`, and the precedence is absolute: `rules/` is normative and always wins, research is evidence
+and hypotheses and constrains nothing.** A claim becomes binding only when a human promotes it into a
+rules file. See `research/README.md` for the full reasoning and the four stores.
+
+```
+question ──→ research ──→ note ──→ learning ──→ idea ──→ propose ──→ live ──→ verdict
+    ↑                                  ↑                                          │
+    └───── raised by any stage ────────┴───────── log-evidence ───────────────────┘
+```
+
+Two things make it a loop rather than a growing pile:
+
+- **The open-question queue.** A research pass starts by popping from it, not from "go look into
+  women's ads". Every other mode fills it — an `inconclusive` audit verdict, an idea held pending
+  research, an intake raising a why-does-this-work.
+- **`log-evidence`, the back-edge.** When a campaign returns a verdict, that verdict lands on the
+  learning that produced the recommendation and marks it supported, contradicted or mixed. Without
+  it the library only ever grows and never corrects itself — and a store that confidently records
+  wrong things is worse than no store.
+
+Confidence is gated rather than self-declared: only `live-data` and `platform-doc` claims may be
+`high`, and a `live-data` claim below `MIN_SAMPLE = 30` can only be `low` (SPEC.md decision #6). That
+exists because `rules/targeting.md` already carries dated observations with no source attached, and
+the live women's record cites one of them to justify a ₹5,000 spend with no way to check what it rested
+on.
+
 ## The ledger
 
 `campaigns/<slug>/record.md` — one markdown file per recommendation, YAML front matter + an appended
@@ -91,6 +120,14 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 | `abandon` | Close out a recommendation that was never executed |
 | `stats` | Deterministic counts over the ledger |
 | `dump-ledger` | Print the ledger index |
+| `ingest` | Store a note you brought in, verbatim and immutable, as provenance for learnings |
+| `learn` | Record one derived claim, with the source kind and confidence that make it citable |
+| `log-evidence` | Attach a dated outcome to a learning — the back-edge that lets it be corrected |
+| `promote` | Record that a learning has graduated into a rules file and is now normative |
+| `retire` | Close out a learning that is no longer worth carrying |
+| `question` | Add an open research question to the queue that drives the next research pass |
+| `answer` | Close an open question, optionally naming what it taught |
+| `idea` | Record a recommend/hold idea with the spend it would take to test it |
 | `open` | Every loose end the ledger can see — start here when you come back to this repo |
 | `commands` | Print the command list, or regenerate it in README and the wiki cheatsheet |
 | `fetch-analytics` | Pull pocket-dating-coach's ad analytics via the authenticated internal endpoint |
@@ -98,7 +135,7 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 #### `propose`
 
 ```
-ad-agent propose [-h] --network {snap,meta} --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
+ad-agent propose [-h] --network {snap,meta} --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
 ```
 
 #### `snap-push`
@@ -147,6 +184,54 @@ ad-agent stats [-h]
 
 ```
 ad-agent dump-ledger [-h] [--status {proposed,executing,live,reviewed,abandoned}]
+```
+
+#### `ingest`
+
+```
+ad-agent ingest [-h] --title TITLE --source {live-data,platform-doc,own-research,competitor-observation,intuition} (--file FILE | --text TEXT) [--slug SLUG]
+```
+
+#### `learn`
+
+```
+ad-agent learn [-h] --claim CLAIM --subject {audience,creative,channel,tracking,competitor,product,budget} --source {live-data,platform-doc,own-research,competitor-observation,intuition} --confidence {high,medium,low} [--sample-n SAMPLE_N] --evidence EVIDENCE [--derived-from DERIVED_FROM] [--answers ANSWERS] [--slug SLUG]
+```
+
+#### `log-evidence`
+
+```
+ad-agent log-evidence [-h] --outcome {supported,contradicted,inconclusive} --text TEXT [--from FROM_REF] learning_id
+```
+
+#### `promote`
+
+```
+ad-agent promote [-h] --rule RULE learning_id
+```
+
+#### `retire`
+
+```
+ad-agent retire [-h] --reason REASON learning_id
+```
+
+#### `question`
+
+```
+ad-agent question [-h] --text TEXT --kind {audience,creative,channel,tracking,competitor,product,budget} --why WHY [--raised-by RAISED_BY] [--slug SLUG]
+```
+
+#### `answer`
+
+```
+ad-agent answer [-h] --text TEXT [--learning LEARNING] [--dropped] question_id
+```
+
+#### `idea`
+
+```
+ad-agent idea [-h] --title TITLE --verdict {recommend,hold} --network {snap,meta} --persona PERSONA --est-daily EST_DAILY --est-days EST_DAYS --rationale RATIONALE [--learning LEARNING] [--blocked-on BLOCKED_ON] [--slug SLUG]
 ```
 
 #### `open`

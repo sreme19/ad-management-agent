@@ -164,6 +164,11 @@ Skill (live reasoning, in a Claude Code session)
   → pulls read-only data through ad-agent's zero-API CLI
        fetch-analytics  (channel 1: pocket-dating-coach's authenticated endpoint)
 
+The research loop persists the same way, through its own stores:
+       ingest / learn / log-evidence / promote / retire   research/notes, research/learnings
+       question / answer                                  research/questions
+       idea  (+ propose --from-idea)                      ideas/
+
 Two commands serve the human rather than a skill:
        open       every loose end the ledger can see — the "where was I" entry point
        commands   regenerates the command list in README.md and the wiki cheatsheet
@@ -250,6 +255,35 @@ proposed → executing → live → reviewed
   Status → `reviewed`.
 - `ad-agent abandon <rec_id> --reason ...` — for a proposal you decided not to execute. Without this,
   unexecuted proposals sit as `proposed` forever and pollute `stats`.
+
+## Research (evidence and hypotheses — never constraints)
+
+**Added 2026-08-26, closing the hole that modes 7 and 8 had no write path at all.** `ad-ideation` and
+`ad-intake` did their reasoning in a session and produced prose that died with it — the only two modes
+in the repo with no persistence, which is why `rules/targeting.md` ended up carrying inline dated
+observations with no source, and why the live women's record cites "the Aug 9 note" to justify ₹5,000
+of spend with no way to check whether it came from a test, a screenshot, or a hunch.
+
+`research/` (notes, learnings, questions) and `ideas/` are that write path. **Precedence over `rules/`
+is one-directional and absolute: rules win.** Nothing under `research/` constrains anything; a skill
+finding a learning that disagrees with a rule follows the rule and raises a question. Promotion into a
+rules file is a human decision, recorded afterwards with `ad-agent promote`, never a status change on
+its own. See `research/README.md`.
+
+Four properties are load-bearing:
+
+- **Notes are immutable.** The content *is* the provenance; a claim pointing back at a note that could
+  have been rewritten proves nothing.
+- **Confidence is gated, not self-declared.** Only `live-data` and `platform-doc` may be `high`;
+  everything else caps at `medium`. A `live-data` claim must state its sample size and can only be
+  `low` below `MIN_SAMPLE = 30` — decision #6, applied so a brief cannot lean on a number the
+  dashboard itself would call inconclusive.
+- **The back-edge is a command, not a habit.** `log-evidence` puts a campaign's verdict onto the
+  learning that spawned the recommendation. Disagreeing outcomes produce `mixed`, not whichever
+  arrived last.
+- **Claims go stale on a clock set by their source** — competitor observations 60 days, hunches 90,
+  own research and live data 120, platform docs 180. `open` reports what is past due, and reports a
+  stale claim as unverified rather than as wrong.
 
 ## Rules (single source of truth — read live, edited in place when refined)
 

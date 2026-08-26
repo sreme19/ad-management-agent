@@ -42,8 +42,8 @@ class TestItNamesWhatItCannotSee:
         out = capsys.readouterr().out
         assert "Nothing open in the ledger" in out
         # The important half: absence of a section is not evidence of nothing to do.
-        assert "Not wired yet" in out
-        assert "does not" in out and "nothing outstanding" in out
+        assert "No store yet for: questions, notes, learnings, ideas" in out
+        assert "not evidence" in out and "nothing outstanding" in out
 
 
 class TestLooseEnds:
