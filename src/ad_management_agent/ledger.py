@@ -87,6 +87,7 @@ class Ledger:
         ad_set_name: str,
         ad_name: str,
         targeting_summary: str,
+        targeting: dict | None,
         creative_ref: str,
         destination_url: str,
         budget_cap_inr_per_day: float,
@@ -116,6 +117,9 @@ class Ledger:
             "ad_set_id": None,
             "ad_id": None,
             "targeting_summary": targeting_summary,
+            # Prose above for the human, normalized block below for the pusher.
+            # See targeting.py for why both exist rather than only the prose.
+            "targeting": targeting or None,
             "creative_ref": creative_ref,
             "destination_url": destination_url,
             "budget_cap_inr_per_day": budget_cap_inr_per_day,
@@ -133,6 +137,7 @@ class Ledger:
         "ad_set_name",
         "ad_name",
         "targeting_summary",
+        "targeting",
         "creative_ref",
         "destination_url",
         "budget_cap_inr_per_day",
@@ -172,16 +177,27 @@ class Ledger:
                 f"Amendable fields are: {', '.join(self.AMENDABLE)}."
             )
 
+        # A dict-valued field (targeting) is applied whole but reported per sub-key,
+        # so the Amendment section says "min_age 18 -> 23" rather than dumping two
+        # mappings and leaving the reader to spot the difference.
         diff = {}
+        applied = {}
         for field, new in changes.items():
             old = rec.front_matter.get(field)
-            if old != new:
+            if old == new:
+                continue
+            applied[field] = new
+            if isinstance(new, dict) and isinstance(old, dict):
+                for k in sorted(set(old) | set(new)):
+                    if old.get(k) != new.get(k):
+                        diff[f"{field}.{k}"] = (old.get(k), new.get(k))
+            else:
                 diff[field] = (old, new)
 
         if not diff:
             return rec, diff
 
-        rec.front_matter.update({f: n for f, (_, n) in diff.items()})
+        rec.front_matter.update(applied)
         rec.front_matter["amended"] = today
 
         rows = "\n".join(f"- `{f}`: {old!r} → {new!r}" for f, (old, new) in sorted(diff.items()))
@@ -222,6 +238,35 @@ class Ledger:
         if deviated:
             section += f"- Deviated from brief: {deviated}\n"
         rec.body += section
+        rec.save()
+        return rec
+
+    def record_campaign_caps(
+        self,
+        rec_id: str,
+        *,
+        daily_inr: float | None,
+        lifetime_inr: float | None,
+        today: str,
+    ) -> Record:
+        """Record what the parent campaign's caps actually were at push time.
+
+        Not part of the lifecycle and not amendable — it is an observation of the
+        platform, written by `snap-push` because that is the only moment the value
+        is known for certain. `budget_cap_inr_per_day` is what was *proposed*; the
+        effective daily spend is the lower of that and this. Without both figures
+        on the record, `ad-agent open` cannot tell a properly funded ad set from
+        one silently capped below rules/budget.md's floor, which is exactly what
+        happened on 2026-08-26.
+
+        A verified absence is information too: `campaign_daily_cap_inr: null` with
+        a `campaign_caps_verified` date means "checked, no cap", which is different
+        from a record that was never checked at all.
+        """
+        rec = self.find(rec_id)
+        rec.front_matter["campaign_daily_cap_inr"] = daily_inr
+        rec.front_matter["campaign_lifetime_cap_inr"] = lifetime_inr
+        rec.front_matter["campaign_caps_verified"] = today
         rec.save()
         return rec
 

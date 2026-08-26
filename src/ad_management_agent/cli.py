@@ -15,13 +15,63 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from . import destinations, snap as snapapi
+from . import budget as budgetrules
+from . import destinations, snap as snapapi, targeting as targetingspec
 from .config import load_config
 from .ledger import STATUSES, Ledger
 
 
 def _today() -> str:
     return _dt.date.today().isoformat()
+
+
+def _add_targeting_flags(sp: argparse.ArgumentParser, *, required: bool) -> None:
+    """The structured audience, as flags on both `propose` and `amend`.
+
+    Discrete flags rather than a JSON blob or a second file: a skill calls this
+    programmatically and a human reads the invocation back in the shell history,
+    and both are better served by `--gender FEMALE --min-age 18` than by quoting
+    YAML through argv.
+    """
+    g = sp.add_argument_group(
+        "targeting (structured — this is what snap-push actually pushes)"
+    )
+    g.add_argument("--gender", required=required, default=None,
+                   choices=list(targetingspec.GENDERS),
+                   help="single-gender only; rules/targeting.md forbids a mixed ad set")
+    g.add_argument("--min-age", required=required, default=None,
+                   help="18 or above — rules/compliance.md is 18+ without exception")
+    g.add_argument("--max-age", required=required, default=None,
+                   help="a number, or 50+ for the open-ended top band")
+    g.add_argument("--countries", required=required, default=None,
+                   help="comma-separated 2-letter codes, e.g. in")
+    g.add_argument("--os", default=None, choices=list(targetingspec.OS_TYPES),
+                   help="omit to target all devices")
+    g.add_argument("--expansion", default=None, choices=["on", "off"],
+                   help="Snap targeting expansion; defaults to on for a new proposal")
+
+
+def _targeting_patch(args: argparse.Namespace) -> dict:
+    """Only the targeting fields the caller actually passed."""
+    patch: dict = {}
+    if args.gender is not None:
+        patch["gender"] = args.gender.upper()
+    if args.min_age is not None:
+        patch["min_age"] = str(args.min_age)
+    if args.max_age is not None:
+        patch["max_age"] = str(args.max_age)
+    if args.countries is not None:
+        patch["countries"] = [c.strip().lower() for c in args.countries.split(",") if c.strip()]
+    if args.os is not None:
+        patch["os"] = args.os.upper()
+    if args.expansion is not None:
+        patch["expansion"] = args.expansion == "on"
+    return patch
+
+
+def _fail(exc: Exception) -> None:
+    print(f"error: {exc}", file=sys.stderr)
+    raise SystemExit(2) from exc
 
 
 def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
@@ -34,8 +84,27 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
             rules_dir=ledger.root / "rules",
         )
     except destinations.DestinationGateError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        raise SystemExit(2) from exc
+        _fail(exc)
+
+    # The structured audience, validated before anything is written, and checked
+    # against the ad-set name so the record cannot disagree with itself.
+    try:
+        spec = targetingspec.build(
+            gender=args.gender,
+            min_age=args.min_age,
+            max_age=args.max_age,
+            countries=[c.strip() for c in args.countries.split(",")],
+            os=args.os,
+            expansion=(args.expansion or "on") == "on",
+        )
+        targetingspec.check_matches_ad_set_name(spec, args.ad_set_name)
+    except targetingspec.TargetingError as exc:
+        _fail(exc)
+
+    if budgetrules.below_floor(args.budget_cap):
+        print(f"note: {budgetrules.floor_note(args.budget_cap)}\n"
+              "      Proposing anyway — the cap is your call, but say why in the brief.",
+              file=sys.stderr)
 
     rec = ledger.propose(
         slug=args.slug,
@@ -44,6 +113,7 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
         ad_set_name=args.ad_set_name,
         ad_name=args.ad_name,
         targeting_summary=args.targeting_summary,
+        targeting=spec,
         creative_ref=args.creative_ref,
         destination_url=args.destination_url,
         budget_cap_inr_per_day=args.budget_cap,
@@ -67,11 +137,27 @@ def cmd_amend(args: argparse.Namespace, ledger: Ledger) -> None:
         "duration_days": args.duration_days,
     }
     changes = {k: v for k, v in fields.items() if v is not None}
+
+    rec = ledger.find(args.rec_id)
+
+    # Targeting is patched, not replaced: `--min-age 23` on its own should move one
+    # field, not silently drop the geography. The merged result is validated as a
+    # whole, so a patch cannot leave the record in a state propose would refuse.
+    patch = _targeting_patch(args)
+    if patch:
+        merged = {**(rec.front_matter.get("targeting") or {}), **patch}
+        try:
+            targetingspec.validate(merged)
+            targetingspec.check_matches_ad_set_name(
+                merged, changes.get("ad_set_name") or rec.front_matter.get("ad_set_name", "")
+            )
+        except targetingspec.TargetingError as exc:
+            _fail(exc)
+        changes["targeting"] = merged
+
     if not changes:
         print("error: nothing to amend — pass at least one field to change", file=sys.stderr)
         raise SystemExit(2)
-
-    rec = ledger.find(args.rec_id)
 
     # Close the loophole: amend must not be a way around the destination gate.
     # Re-run it whenever this amendment touches the audience or the destination,
@@ -88,8 +174,19 @@ def cmd_amend(args: argparse.Namespace, ledger: Ledger) -> None:
                 rules_dir=ledger.root / "rules",
             )
         except destinations.DestinationGateError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            raise SystemExit(2) from exc
+            _fail(exc)
+
+        # Renaming an ad set can flip the gender token, which would leave a record
+        # whose name and targeting disagree. Re-check even when the targeting itself
+        # was not part of this amendment.
+        if "ad_set_name" in changes and rec.front_matter.get("targeting"):
+            try:
+                targetingspec.check_matches_ad_set_name(
+                    changes.get("targeting") or rec.front_matter["targeting"],
+                    changes["ad_set_name"],
+                )
+            except targetingspec.TargetingError as exc:
+                _fail(exc)
 
     try:
         rec, diff = ledger.amend(
@@ -108,26 +205,65 @@ def cmd_amend(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"  {field}: {old!r} -> {new!r}")
 
 
-# Mirrors the account's best-performing women's ad squad, `Female 18-22-LPV`
-# (20.9% tap rate, n=110): broad, no interest narrowing, expansion on. That set
-# was starved at ~Rs 50/day; this changes the budget and the name, not the
-# audience, which is the whole point of the recommendation.
-def _women_1822_targeting() -> dict:
-    return {
-        # Dating is a regulated category on Snap. The predecessor carries this and
-        # an ad squad without it is a different, and rejectable, ad squad.
-        "regulated_content": True,
-        "demographics": [
-            {"min_age": "18", "max_age": "22", "gender": "FEMALE", "operation": "INCLUDE"}
-        ],
-        "geos": [{"country_code": "in", "operation": "INCLUDE"}],
-        "devices": [{"os_type": "ANDROID", "operation": "INCLUDE"}],
-        "enable_targeting_expansion": True,
-        "auto_expansion_options": {
-            "interest_expansion_option": {"enabled": True},
-            "custom_audience_expansion_option": {"enabled": True},
-        },
-    }
+def _gate_campaign_caps(caps: dict, *, squad_daily_inr: float, duration_days: int,
+                        rec_id: str, accept: bool) -> None:
+    """Refuse to hang an ad squad off a campaign whose own cap would starve it.
+
+    The lower figure binds. WOMEN_18-22_CASUAL_LPV was pushed on 2026-08-26 with an
+    ad squad at Rs 1,000/day under a campaign capped at Rs 300/day; the effective
+    spend was 30% of the plan and below rules/budget.md's floor, which made the
+    result inconclusive before a rupee was spent. The push printed nothing about it
+    because nothing read the parent.
+
+    This is not the destination gate — there IS an escape hatch here, because a low
+    cap is sometimes a deliberate choice rather than an error. But it is explicit,
+    it names the deviation, and it tells you where to record it.
+    """
+    daily_cap = caps.get("daily_inr")
+    lifetime_cap = caps.get("lifetime_inr")
+    planned_total = squad_daily_inr * duration_days
+
+    binding = []
+    if daily_cap is not None and daily_cap < squad_daily_inr:
+        binding.append(
+            f"campaign daily cap is Rs {daily_cap:.0f}/day, below this ad squad's "
+            f"Rs {squad_daily_inr:.0f}/day — the cap binds, so effective spend is "
+            f"Rs {daily_cap:.0f}/day"
+        )
+    if lifetime_cap is not None and lifetime_cap < planned_total:
+        binding.append(
+            f"campaign lifetime cap is Rs {lifetime_cap:.0f}, below the planned "
+            f"Rs {planned_total:.0f} ({squad_daily_inr:.0f} x {duration_days}d)"
+        )
+
+    if not binding:
+        if daily_cap is None and lifetime_cap is None:
+            print("campaign  no spend cap on the parent — the ad squad budget is the "
+                  "effective one")
+        else:
+            print(f"campaign  cap checked: daily={daily_cap}, lifetime={lifetime_cap} — "
+                  "neither binds")
+        if budgetrules.below_floor(squad_daily_inr):
+            print(f"WARNING   {budgetrules.floor_note(squad_daily_inr)}")
+        return
+
+    effective = min([v for v in (daily_cap, squad_daily_inr) if v is not None])
+    lines = ["", "BLOCKED: the parent campaign's own cap would override this ad squad's budget."]
+    lines += [f"  - {b}" for b in binding]
+    if budgetrules.below_floor(effective):
+        lines += ["", "  " + budgetrules.floor_note(effective)]
+    lines += [
+        "",
+        "  Fix the cap in Ads Manager (Campaign > Daily spend cap) and push again — or, if the",
+        "  cap is deliberate, re-run with --accept-campaign-cap to create it anyway. Doing that",
+        "  records the deviation rather than hiding it:",
+        f"    ad-agent note {rec_id} --kind budget --text \"...\"",
+    ]
+    if not accept:
+        print("\n".join(lines), file=sys.stderr)
+        raise SystemExit(2)
+    print("\n".join(lines))
+    print("\n--accept-campaign-cap: proceeding with the cap above as a stated deviation.")
 
 
 def _utm_url(destination: str, campaign_name: str, ad_squad_id: str,
@@ -187,7 +323,23 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
     end = start + _dt.timedelta(days=int(fm["duration_days"]))
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S.000Z")  # noqa: E731
     budget = float(fm["budget_cap_inr_per_day"])
-    targeting = _women_1822_targeting()
+
+    spec = fm.get("targeting")
+    if not spec:
+        print(f"error: {args.rec_id} has no structured `targeting` block, so there is nothing\n"
+              "safe to push. Until 2026-08-26 this command used a hardcoded audience, which\n"
+              "meant any record but the first would have been created with the first one's\n"
+              "targeting and still diffed clean. Add it:\n"
+              f"  ad-agent amend {args.rec_id} --reason 'add structured targeting' \\\n"
+              "    --gender FEMALE --min-age 18 --max-age 22 --countries in --os ANDROID",
+              file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        targetingspec.validate(spec)
+        targetingspec.check_matches_ad_set_name(spec, fm["ad_set_name"])
+    except targetingspec.TargetingError as exc:
+        _fail(exc)
+    targeting = targetingspec.to_snap(spec)
 
     plan = [
         ("campaign   ", fm["campaign_name"]),
@@ -196,23 +348,51 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
         ("ad         ", fm["ad_name"]),
         ("creative   ", f'{asset.name}  headline={args.headline!r}  CTA=MORE'),
         ("destination", fm["destination_url"]),
-        ("targeting  ", "female 18-22, IN, Android, expansion on, no interest narrowing"),
+        ("targeting  ", targetingspec.describe(spec)),
     ]
     print(f"Plan for {args.rec_id} (everything created PAUSED):")
     for k, v in plan:
         print(f"  {k}  {v}")
+
+    # A dry run still reads the parent campaign's spend cap. That check is the whole
+    # reason to dry-run at all — it is the one thing that can silently invalidate the
+    # test — so returning before it would leave the rehearsal unable to rehearse the
+    # only failure it exists to catch. Both calls behind it are read-only GETs.
+    client = None
+    try:
+        client = snapapi.SnapClient(config.get("snap") or {})
+    except snapapi.SnapError as exc:
+        if not args.dry_run:
+            _fail(exc)
+        print(f"\nnote: no Snap credentials, so the parent campaign's spend cap was NOT\n"
+              f"      checked — the one thing most likely to make this ad set unreadable.\n"
+              f"      ({exc})")
+
+    campaign = None
+    if client is not None:
+        campaign = client.find_campaign(fm["campaign_name"])
+        if campaign:
+            print(f"\ncampaign  reusing {campaign['id']}")
+        elif args.dry_run:
+            print(f"\ncampaign  {fm['campaign_name']} does not exist yet; it would be created "
+                  "new, with no cap to inherit")
+        else:
+            campaign = client.create_campaign(fm["campaign_name"], iso(start))
+            print(f"\ncampaign  created {campaign['id']}")
+
+    # Checked before the ad squad exists, not after: a cap that binds is cheaper to
+    # fix while there is nothing hanging off the campaign yet.
+    if campaign is not None:
+        caps = client.campaign_caps(campaign["id"])
+        _gate_campaign_caps(caps, squad_daily_inr=budget, duration_days=int(fm["duration_days"]),
+                            rec_id=args.rec_id, accept=args.accept_campaign_cap)
+        if not args.dry_run:
+            ledger.record_campaign_caps(args.rec_id, daily_inr=caps.get("daily_inr"),
+                                        lifetime_inr=caps.get("lifetime_inr"), today=_today())
+
     if args.dry_run:
         print("\n--dry-run: nothing created.")
         return
-
-    client = snapapi.SnapClient(config.get("snap") or {})
-
-    campaign = client.find_campaign(fm["campaign_name"])
-    if campaign:
-        print(f"\ncampaign  reusing {campaign['id']}")
-    else:
-        campaign = client.create_campaign(fm["campaign_name"], iso(start))
-        print(f"\ncampaign  created {campaign['id']}")
 
     squad = client.create_adsquad(name=fm["ad_set_name"], campaign_id=campaign["id"],
                                   targeting=targeting, daily_budget_inr=budget,
@@ -243,18 +423,16 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
     squad_live = client.get(f"/adsquads/{squad['id']}")["adsquads"][0]["adsquad"]
     ad_live = client.get(f"/ads/{ad['id']}")["ads"][0]["ad"]
     creative_live = client.get(f"/creatives/{creative['id']}")["creatives"][0]["creative"]
-    demo = (squad_live.get("targeting", {}).get("demographics") or [{}])[0]
 
     checks = [
         ("ad squad status", squad_live.get("status"), "PAUSED"),
         ("ad status", ad_live.get("status"), "PAUSED"),
         ("daily budget", squad_live.get("daily_budget_micro"), int(budget * snapapi.MICRO)),
         ("optimisation goal", squad_live.get("optimization_goal"), "LANDING_PAGE_VIEW"),
-        ("gender", demo.get("gender"), "FEMALE"),
-        ("min age", str(demo.get("min_age")), "18"),
-        ("max age", str(demo.get("max_age")), "22"),
-        ("country", (squad_live.get("targeting", {}).get("geos") or [{}])[0].get("country_code"), "in"),
-        ("os", (squad_live.get("targeting", {}).get("devices") or [{}])[0].get("os_type"), "ANDROID"),
+        # Derived from the record's own spec, never from a literal — a read-back
+        # compared against a hardcoded dict only ever validates the code against
+        # itself, which is how a wrong audience would have passed silently.
+        *targetingspec.snap_readback_checks(spec, squad_live),
         ("headline", creative_live.get("headline"), args.headline),
         ("landing url", creative_live.get("web_view_properties", {}).get("url"), final_url),
     ]
@@ -352,6 +530,251 @@ def cmd_dump_ledger(args: argparse.Namespace, ledger: Ledger) -> None:
     print(text)
 
 
+def _age_days(today: _dt.date, when) -> int | None:
+    try:
+        return (today - _dt.date.fromisoformat(str(when))).days
+    except (TypeError, ValueError):
+        return None
+
+
+def _effective_daily(fm: dict) -> tuple[float | None, str]:
+    """The daily spend that actually binds, and how sure we are of it.
+
+    `budget_cap_inr_per_day` is what was proposed. A campaign-level cap silently
+    overrides it. Records pushed since 2026-08-26 carry the observed cap, so the
+    effective figure is knowable; older ones do not, and this says so rather than
+    quietly reporting the proposed number as though it were the real one.
+    """
+    proposed = fm.get("budget_cap_inr_per_day")
+    if proposed is None:
+        return None, "no budget on record"
+    proposed = float(proposed)
+    if not fm.get("campaign_caps_verified"):
+        return proposed, "campaign cap never checked"
+    cap = fm.get("campaign_daily_cap_inr")
+    if cap is None:
+        return proposed, "verified: no campaign cap"
+    return min(proposed, float(cap)), f"campaign cap Rs {float(cap):.0f}/day binds"
+
+
+def cmd_open(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Every loose end the ledger can see, in one place.
+
+    The point is not a syntax reference — it is the answer to "where was I". A
+    loop-engineered system's failure mode is not a wrong decision, it is a step
+    that quietly never happened: a proposal never executed, a live ad set past its
+    kill window with no verdict, a creative that cleared QA and was never used.
+    None of that is visible in INDEX.md, which only lists records.
+
+    Everything below is derived. This command holds no state of its own.
+    """
+    today = _dt.date.fromisoformat(_today())
+    records = ledger.all()
+    root = ledger.root
+    sections: list[tuple[str, list[str]]] = []
+
+    # --- proposals that never became anything ---
+    rows = []
+    for r in records:
+        if r.status != "proposed":
+            continue
+        age = _age_days(today, r.front_matter.get("created"))
+        stale = " STALE" if (age or 0) > 7 else ""
+        rows.append(f"{r.rec_id}  proposed {age}d ago{stale}  "
+                    f"-> snap-push, or abandon --reason")
+    if rows:
+        sections.append(("Proposed, never executed", rows))
+
+    # --- live ad sets, against their own kill/double window ---
+    due, running = [], []
+    for r in records:
+        if r.status != "live":
+            continue
+        fm = r.front_matter
+        since = _age_days(today, fm.get("executed"))
+        window = int(fm.get("duration_days") or budgetrules.KILL_WINDOW_DAYS_MAX)
+        if since is None:
+            running.append(f"{r.rec_id}  live, no execution date on record")
+        elif since >= window:
+            due.append(f"{r.rec_id}  live {since}d, window was {window}d  "
+                       f"-> ad-audit, then log-review")
+        else:
+            running.append(f"{r.rec_id}  live {since}d of {window}d  "
+                           f"-> review from {(_dt.date.fromisoformat(str(fm['executed'])) + _dt.timedelta(days=window)).isoformat()}")
+    if due:
+        sections.append(("Live and past the review window — no verdict yet", due))
+    if running:
+        sections.append(("Live, still inside the window", running))
+
+    # --- funding, per rules/budget.md ---
+    rows = []
+    for r in records:
+        if r.status not in ("proposed", "live"):
+            continue
+        eff, why = _effective_daily(r.front_matter)
+        if eff is None:
+            continue
+        if budgetrules.below_floor(eff):
+            rows.append(f"{r.rec_id}  Rs {eff:.0f}/day effective ({why})  "
+                        f"-> below the Rs {budgetrules.MIN_VIABLE_DAILY_INR:.0f} floor; "
+                        f"a weak read is inconclusive, not evidence")
+        elif r.status == "live" and not r.front_matter.get("campaign_caps_verified"):
+            # Only meaningful once something is live: a proposal has no parent
+            # campaign to have been capped by yet.
+            rows.append(f"{r.rec_id}  Rs {eff:.0f}/day proposed, but {why}  "
+                        f"-> the real figure may be lower")
+    if rows:
+        sections.append(("Funding below the floor, or unverified", rows))
+
+    # --- creative: cleared but unused, and used but unreviewed ---
+    referenced = {str(r.front_matter.get("creative_ref") or "").strip("/") for r in records}
+    uncleared, unused, no_backedge = [], [], []
+    for r in records:
+        ref = str(r.front_matter.get("creative_ref") or "").strip("/")
+        if not ref or r.status in ("abandoned",):
+            continue
+        qa = root / ref / "qa.md"
+        if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
+            uncleared.append(f"{r.rec_id}  {ref}  -> no recorded QA pass "
+                             f"(rules/creative-generation.md sec 10)")
+    for d in sorted((root / "creatives").glob("*/")):
+        ref = f"creatives/{d.name}"
+        qa = d / "qa.md"
+        if not qa.exists():
+            continue
+        if "`pass`" in qa.read_text(encoding="utf-8") and ref not in referenced:
+            unused.append(f"{ref}  cleared QA, no record uses it  -> propose one, or say why not")
+    for r in records:
+        if r.status != "reviewed":
+            continue
+        ref = str(r.front_matter.get("creative_ref") or "").strip("/")
+        prompts = root / ref / "prompts.md"
+        if ref and prompts.exists():
+            text = prompts.read_text(encoding="utf-8").lower()
+            if "verdict" not in text:
+                no_backedge.append(
+                    f"{r.rec_id}  {ref}/prompts.md carries no verdict  "
+                    f"-> creative-generation.md sec 9: a prompt with no outcome taught nothing")
+    if uncleared:
+        sections.append(("Creative not cleared by the QA gate", uncleared))
+    if unused:
+        sections.append(("Creative cleared but never used", unused))
+    if no_backedge:
+        sections.append(("Verdict never written back to the prompt library", no_backedge))
+
+    # --- report ---
+    if sections:
+        for title, rows in sections:
+            print(f"{title} ({len(rows)})")
+            for row in rows:
+                print(f"  {row}")
+            print()
+    else:
+        print("Nothing open in the ledger.\n")
+
+    # Absence of a section is not evidence of nothing to do — say what this command
+    # cannot yet see, so a quiet report is not mistaken for a finished loop.
+    unwired = [name for name, sub in (("research questions", "research"),
+                                      ("learnings", "research"),
+                                      ("ideas", "ideas")) if not (root / sub).exists()]
+    if unwired:
+        print("Not wired yet, so not counted above: " + ", ".join(sorted(set(unwired))) + ".")
+        print("Those loops have no store in this repo yet — an empty report above does not")
+        print("mean there is nothing outstanding in them.")
+
+
+COMMANDS_BEGIN = "<!-- BEGIN GENERATED: ad-agent commands -->"
+COMMANDS_END = "<!-- END GENERATED: ad-agent commands -->"
+COMMANDS_DOCS = ("README.md", "wiki-export/Command-Cheatsheet.md")
+
+
+def _subcommands(parser: argparse.ArgumentParser) -> list[tuple[str, str, argparse.ArgumentParser]]:
+    """(name, help, parser) for every subcommand, in the order they were declared.
+
+    Reaches into argparse's private `_actions` / `_choices_actions`, deliberately:
+    the alternative is a hand-maintained list of commands, which is the exact thing
+    this function exists to stop anyone from keeping.
+    """
+    out = []
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        helps = {ca.dest: (ca.help or "") for ca in action._choices_actions}
+        for name, sub in action.choices.items():
+            out.append((name, helps.get(name, ""), sub))
+    return out
+
+
+def _commands_markdown(parser: argparse.ArgumentParser) -> str:
+    cmds = _subcommands(parser)
+    lines = [
+        "<!-- Generated by `ad-agent commands --write`. Do not hand-edit this block. -->",
+        "",
+        "| command | what it does |",
+        "|---|---|",
+    ]
+    for name, help_text, _ in cmds:
+        lines.append(f"| `{name}` | {help_text} |")
+    lines.append("")
+    for name, _, sub in cmds:
+        usage = " ".join(sub.format_usage().replace("usage:", "", 1).split())
+        lines += [f"#### `{name}`", "", "```", usage, "```", ""]
+    return "\n".join(lines).rstrip()
+
+
+def cmd_commands(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Print — or write — the command list, so no hand-maintained copy can drift.
+
+    On 2026-08-26 both README.md and the wiki cheatsheet still said this agent
+    never calls a Snap API, hours after it had created a live ad set through one,
+    and neither listed `snap-push` at all. Three hand-kept copies of one list is
+    why. The prose around each command stays hand-written — that is where the
+    reasoning lives — but the list itself is generated from the parser.
+    """
+    parser = build_parser()
+    block = _commands_markdown(parser)
+    names = [n for n, _, _ in _subcommands(parser)]
+
+    if args.check:
+        missing_docs, undocumented = [], []
+        for rel in COMMANDS_DOCS:
+            path = ledger.root / rel
+            if not path.exists():
+                missing_docs.append(rel)
+                continue
+            text = path.read_text(encoding="utf-8")
+            outside = text.split(COMMANDS_BEGIN)[0] + text.split(COMMANDS_END)[-1]
+            for name in names:
+                if f"ad-agent {name}" not in outside and rel.endswith("Command-Cheatsheet.md"):
+                    undocumented.append(f"{rel}: `{name}` has no hand-written section")
+        for row in missing_docs:
+            print(f"missing: {row}", file=sys.stderr)
+        for row in undocumented:
+            print(row, file=sys.stderr)
+        if missing_docs or undocumented:
+            raise SystemExit(1)
+        print(f"ok — {len(names)} commands, all documented")
+        return
+
+    if not args.write:
+        print(block)
+        return
+
+    for rel in COMMANDS_DOCS:
+        path = ledger.root / rel
+        text = path.read_text(encoding="utf-8")
+        if COMMANDS_BEGIN not in text or COMMANDS_END not in text:
+            print(f"error: {rel} has no generated block. Add these two markers where the\n"
+                  f"command list should go:\n  {COMMANDS_BEGIN}\n  {COMMANDS_END}",
+                  file=sys.stderr)
+            raise SystemExit(2)
+        head = text.split(COMMANDS_BEGIN)[0]
+        tail = text.split(COMMANDS_END, 1)[1]
+        path.write_text(f"{head}{COMMANDS_BEGIN}\n{block}\n{COMMANDS_END}{tail}",
+                        encoding="utf-8")
+        print(f"wrote {rel}")
+
+
 def cmd_fetch_analytics(args: argparse.Namespace, config: dict) -> None:
     url = config.get("pdc", {}).get("analytics_url")
     api_key = config.get("pdc", {}).get("api_key")
@@ -404,6 +827,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--budget-cap", required=True, type=float, help="INR per day")
     sp.add_argument("--duration-days", required=True, type=int)
     sp.add_argument("--brief", required=True, help="path to a markdown brief file")
+    _add_targeting_flags(sp, required=True)
     sp.set_defaults(func=cmd_propose)
 
     sp = sub.add_parser(
@@ -415,6 +839,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Snap headline, 34 chars max")
     sp.add_argument("--dry-run", action="store_true",
                     help="print the plan and create nothing")
+    sp.add_argument("--accept-campaign-cap", action="store_true",
+                    help="create anyway when the parent campaign's cap would bind, as a "
+                         "stated deviation rather than a surprise")
     sp.set_defaults(func=cmd_snap_push)
 
     sp = sub.add_parser(
@@ -435,6 +862,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp.add_argument("--budget-cap", default=None, type=float, help="INR per day")
     sp.add_argument("--duration-days", default=None, type=int)
+    _add_targeting_flags(sp, required=False)
     sp.set_defaults(func=cmd_amend)
 
     sp = sub.add_parser("log-setup", help="Record the real IDs after setting the ad up by hand")
@@ -475,6 +903,22 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("dump-ledger", help="Print the ledger index")
     sp.add_argument("--status", default=None, choices=list(STATUSES))
     sp.set_defaults(func=cmd_dump_ledger)
+
+    sp = sub.add_parser(
+        "open",
+        help="Every loose end the ledger can see — start here when you come back to this repo",
+    )
+    sp.set_defaults(func=cmd_open)
+
+    sp = sub.add_parser(
+        "commands",
+        help="Print the command list, or regenerate it in README and the wiki cheatsheet",
+    )
+    sp.add_argument("--write", action="store_true",
+                    help="splice the list into README.md and wiki-export/Command-Cheatsheet.md")
+    sp.add_argument("--check", action="store_true",
+                    help="fail if a command has no hand-written section in the cheatsheet")
+    sp.set_defaults(func=cmd_commands)
 
     sp = sub.add_parser(
         "fetch-analytics",

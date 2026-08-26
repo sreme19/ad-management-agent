@@ -22,6 +22,9 @@ created: '2026-08-21'
 amended: '2026-08-26'
 executed: '2026-08-26'
 last_note: '2026-08-26'
+campaign_daily_cap_inr: 300.0
+campaign_lifetime_cap_inr: null
+campaign_caps_verified: '2026-08-26'
 ---
 
 ## Brief (proposed)

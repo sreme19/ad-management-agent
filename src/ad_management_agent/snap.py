@@ -126,6 +126,25 @@ class SnapClient:
             )
         return hits[0] if hits else None
 
+    def campaign_caps(self, campaign_id: str) -> dict:
+        """Read a campaign's own spend caps, in INR. Either may be None.
+
+        A campaign-level cap silently overrides a larger ad-squad budget: the lower
+        figure binds. On 2026-08-26 WOMEN_18-22_CASUAL_LPV was created with an ad
+        squad carrying Rs 1,000/day under a campaign capped at Rs 300/day, which put
+        the live test below rules/budget.md's floor and made its read inconclusive
+        before a rupee was spent. Nothing in the push looked at the parent, so
+        nothing caught it. This is what `snap-push` now checks before it creates
+        anything.
+        """
+        c = self._one(self.get(f"/campaigns/{campaign_id}"), "campaigns")
+        daily = c.get("daily_budget_micro")
+        lifetime = c.get("lifetime_spend_cap_micro")
+        return {
+            "daily_inr": float(daily) / MICRO if daily else None,
+            "lifetime_inr": float(lifetime) / MICRO if lifetime else None,
+        }
+
     def create_campaign(self, name: str, start_time: str) -> dict:
         res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/campaigns", {"campaigns": [{
             "name": name,

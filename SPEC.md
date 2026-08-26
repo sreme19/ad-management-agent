@@ -1,7 +1,8 @@
 # ad-management-agent — Spec
 
 **Status: v1 scaffold.** Ledger CLI (`propose` / `amend` / `note` / `log-setup` / `log-review` /
-`abandon` / `stats` / `dump-ledger` / `fetch-analytics` / `snap-push`) and four skills are built. `fetch-analytics` cannot do anything
+`abandon` / `stats` / `dump-ledger` / `open` / `commands` / `fetch-analytics` / `snap-push`) and four
+skills are built. `fetch-analytics` cannot do anything
 real yet — it depends on a small `pocket-dating-coach` PR (see "Data access") that has not landed.
 
 ## Problem framing
@@ -45,6 +46,15 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
      owner saying so in as many words. Starting spend stays a human action in Ads Manager.
    - Every created object is **read back from the API and diffed** against the plan before the command
      exits. A 200 from a POST is not evidence that an ad squad targets who you think it targets.
+   - The agent **reads the parent campaign's own spend caps before creating an ad squad under it**, and
+     refuses when a cap would bind. A campaign-level daily or lifetime cap silently overrides a larger
+     ad-squad budget — the lower figure wins. `WOMEN_18-22_CASUAL_LPV` was pushed on 2026-08-26 with an
+     ad squad at ₹1,000/day under a campaign capped at ₹300/day, putting the live test below
+     `rules/budget.md`'s floor and making its read inconclusive before a rupee was spent; nothing in the
+     push looked at the parent, so nothing caught it. Unlike the destination gate this one has an
+     escape hatch (`--accept-campaign-cap`), because a low cap is sometimes deliberate — but it names
+     the deviation and prints the `note` command to record it, and never proceeds quietly. The observed
+     caps are written onto the record, so `open` can tell a funded ad set from a starved one.
 
    **Be clear about what was lost.** The old rule was enforced by decision #10 — the agent held no
    credential that could reach a live account, so "never touches a live account" was true by
@@ -144,7 +154,23 @@ Skill (live reasoning, in a Claude Code session)
        snap-push   (decision #3 as amended — creates, never enables)
   → pulls read-only data through ad-agent's zero-API CLI
        fetch-analytics  (channel 1: pocket-dating-coach's authenticated endpoint)
+
+Two commands serve the human rather than a skill:
+       open       every loose end the ledger can see — the "where was I" entry point
+       commands   regenerates the command list in README.md and the wiki cheatsheet
 ```
+
+**`open` is the entry point, and it is deliberately derived.** It holds no state: proposals never
+executed, live ad sets past their kill/double window, creative that cleared QA and was never used,
+funding below `rules/budget.md`'s floor — all computed from the records on every run, so it cannot go
+stale the way a hand-kept TODO would. It also names the loops it *cannot* see yet, so an empty report
+is never mistaken for a finished loop.
+
+**`commands` exists because the documentation failed.** On 2026-08-26 both `README.md` and the wiki
+cheatsheet still asserted that this agent never calls a Snap API, hours after `snap-push` had created a
+live ad set through one, and neither listed `snap-push` at all — three hand-maintained copies of one
+list, none of them right. The list is now generated from the argparse parser; the prose around each
+command stays hand-written, and `commands --check` fails if a command has no prose section.
 
 No server, no daemon, no cron in this repo for v1. Every mode is triggered by asking for it in a
 Claude Code session rooted here (or in a session with this repo attached alongside
@@ -179,6 +205,21 @@ proposed → executing → live → reviewed
 - `ad-agent propose <slug> ...` — mode 5's output. Requires network, campaign/ad-set/ad names,
   targeting summary, a creative reference, a budget cap, a duration, and a brief file (the free-form
   reasoning). Generates a `rec_id`, writes `campaigns/<slug>/record.md`, status `proposed`.
+
+  **A record carries its audience twice, and both are required.** `targeting_summary` is prose — the
+  reasoning, which is what a human reads and what `ad-audit` quotes back. `targeting` is a normalized
+  block (`gender`, `min_age`, `max_age`, `countries`, `os`, `expansion`, `regulated_content`) and it is
+  what `snap-push` actually pushes. Prose cannot be pushed; a machine-readable block cannot explain
+  itself. Before this existed, `snap-push` compensated with a hardcoded audience, which meant the
+  second record ever pushed would have been created carrying the *first* one's targeting — and would
+  have diffed clean, because the read-back was compared against the same hardcoded dict rather than
+  against the brief. The diff is now derived from the record's own spec (`targeting.py`), which is the
+  whole point: a read-back checked against a literal only validates the code against itself.
+
+  Two validations refuse a proposal outright: `min_age` below 18 (`rules/compliance.md` is 18+ without
+  exception, and Snap's dating category enforces the same floor independently), and a targeting block
+  that disagrees with the gender token in its own ad-set name — one of the two is wrong and which one
+  cannot be guessed.
 - `ad-agent amend <rec_id> --reason ... [--ad-name ...] [...]` — revise a still-`proposed`
   recommendation before it is executed, appending an `## Amendment` section recording every
   field that moved. **Only `proposed` records may be amended**: once a record is `live` its fields
