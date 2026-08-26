@@ -225,6 +225,28 @@ class Ledger:
         rec.save()
         return rec
 
+    NOTE_KINDS = ("budget", "targeting", "creative", "incident", "observation")
+
+    def note(self, rec_id: str, *, text: str, kind: str, today: str) -> Record:
+        """Append a dated, append-only note to a record, whatever its status.
+
+        The lifecycle has no other home for something that happens *during* a run.
+        `amend` deliberately refuses a live record, because its fields have to keep
+        describing what was actually built; `log_setup` fires once; `log_review` is
+        the end. So a mid-flight change — a budget raised on day three, an ad set
+        paused for a day, a tracking wobble — would otherwise leave no trace, and the
+        verdict would end up judged against conditions that quietly moved.
+
+        Notes never rewrite anything. They only accumulate.
+        """
+        if kind not in self.NOTE_KINDS:
+            raise ValueError(f"kind must be one of {self.NOTE_KINDS}, got {kind!r}")
+        rec = self.find(rec_id)
+        rec.front_matter["last_note"] = today
+        rec.body += f"\n## Note — {kind} ({today})\n\n{text.strip()}\n"
+        rec.save()
+        return rec
+
     def log_review(
         self,
         rec_id: str,

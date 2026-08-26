@@ -293,6 +293,16 @@ def cmd_log_setup(args: argparse.Namespace, ledger: Ledger) -> None:
     print(f"logged setup for {rec.rec_id} -> status=live")
 
 
+def cmd_note(args: argparse.Namespace, ledger: Ledger) -> None:
+    try:
+        rec = ledger.note(args.rec_id, text=args.text, kind=args.kind, today=_today())
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+    ledger.write_index()
+    print(f"noted on {rec.rec_id} ({args.kind}) -> {rec.path}")
+
+
 def cmd_log_review(args: argparse.Namespace, ledger: Ledger) -> None:
     rec = ledger.log_review(
         args.rec_id,
@@ -435,6 +445,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--ad-id", required=True)
     sp.add_argument("--deviated", default=None, help="what changed from the brief, if anything")
     sp.set_defaults(func=cmd_log_setup)
+
+    sp = sub.add_parser(
+        "note",
+        help="Append a dated note to a record — for things that change mid-run",
+    )
+    sp.add_argument("rec_id")
+    sp.add_argument("--text", required=True, help="what happened, and why it matters to the verdict")
+    sp.add_argument("--kind", default="observation",
+                    choices=list(Ledger.NOTE_KINDS),
+                    help="budget/targeting/creative changes, an incident, or a plain observation")
+    sp.set_defaults(func=cmd_note)
 
     sp = sub.add_parser("log-review", help="Record mode-6's verdict on a live recommendation")
     sp.add_argument("rec_id")

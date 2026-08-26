@@ -42,6 +42,8 @@ verdict, a summary, and an optional longer review-detail file).
 proposed → executing → live → reviewed
     ↑ ↓           ↓
   amend       abandoned
+
+  note — appended at any status, never rewrites
               ↓
           abandoned
 ```

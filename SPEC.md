@@ -1,7 +1,7 @@
 # ad-management-agent — Spec
 
-**Status: v1 scaffold.** Ledger CLI (`propose` / `amend` / `log-setup` / `log-review` / `abandon` /
-`stats` / `dump-ledger` / `fetch-analytics`) and four skills are built. `fetch-analytics` cannot do anything
+**Status: v1 scaffold.** Ledger CLI (`propose` / `amend` / `note` / `log-setup` / `log-review` /
+`abandon` / `stats` / `dump-ledger` / `fetch-analytics` / `snap-push`) and four skills are built. `fetch-analytics` cannot do anything
 real yet — it depends on a small `pocket-dating-coach` PR (see "Data access") that has not landed.
 
 ## Problem framing
@@ -139,7 +139,7 @@ they are load-bearing: the iOS build was actually rejected under App Store Guide
 Skill (live reasoning, in a Claude Code session)
   → does the actual research / targeting / creative work
   → persists through ad-agent's zero-API CLI (this repo)
-       propose / amend / log-setup / log-review / abandon / stats / dump-ledger
+       propose / amend / note / log-setup / log-review / abandon / stats / dump-ledger
   → optionally creates the ad set on Snap, PAUSED, and diffs it back
        snap-push   (decision #3 as amended — creates, never enables)
   → pulls read-only data through ad-agent's zero-API CLI
@@ -172,6 +172,8 @@ Lifecycle:
 proposed → executing → live → reviewed
     ↑ ↓           ↓
   amend       abandoned
+
+  note — appended at any status, never rewrites
 ```
 
 - `ad-agent propose <slug> ...` — mode 5's output. Requires network, campaign/ad-set/ad names,
@@ -189,6 +191,11 @@ proposed → executing → live → reviewed
   recorded here is deliberately the same join key `ad-analytics.ts` uses internally
   (`${network}:${adSetId}`), so `ad-audit` can look up real performance without you ever hand-attaching
   metrics.
+- `ad-agent note <rec_id> --kind budget|targeting|creative|incident|observation --text ...` — an
+  append-only, dated note, allowed at any status. The lifecycle otherwise has no home for something
+  that happens *during* a run: `amend` refuses a live record on purpose, `log-setup` fires once, and
+  `log-review` is the end. Without this, a budget raised on day three leaves no trace and the verdict
+  gets judged against conditions that quietly moved. Notes never rewrite anything.
 - `ad-agent log-review <rec_id> --verdict working|not-working|inconclusive ...` — mode 6's write-back.
   Status → `reviewed`.
 - `ad-agent abandon <rec_id> --reason ...` — for a proposal you decided not to execute. Without this,

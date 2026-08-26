@@ -126,6 +126,15 @@ Only works while the record is still `proposed`. Once it's `live`, a difference 
 reality is a `log-setup --deviated` note, not an amendment — the record has to keep saying what was
 actually built. Amending `--ad-set-name` or `--destination-url` re-runs the destination gate.
 
+If anything changes while the ad set is running — the budget raised, a day paused, a tracking wobble —
+record it. `amend` will refuse a live record, and that is deliberate; use a note instead:
+
+```
+ad-agent note <rec_id> --kind budget|targeting|creative|incident|observation --text "what changed, and why it matters to the verdict"
+```
+
+This is what stops `ad-audit` judging a result against conditions that moved underneath it.
+
 If the user decides not to execute a proposal at all, close it out explicitly rather than leaving it to
 rot as `proposed` forever:
 

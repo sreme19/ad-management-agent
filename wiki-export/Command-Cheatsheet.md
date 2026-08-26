@@ -51,6 +51,17 @@ ad-agent log-setup <rec_id> --network snap|meta \
 Status → `live`. This is what lets `ad-audit` later join a real outcome back to this exact
 recommendation, so this step is mandatory the moment an ad actually goes live &mdash; don't let it sit.
 
+## "Something changed while it was running"
+
+```
+ad-agent note <rec_id> --kind budget|targeting|creative|incident|observation \
+  --text "what changed, and why it matters to the verdict"
+```
+An append-only dated note, allowed at any status. Use it for a budget raised mid-flight, a day paused,
+a tracking problem &mdash; anything that would otherwise leave the verdict judged against conditions
+that quietly moved. `amend` deliberately refuses a live record; this is the thing to reach for instead.
+Notes never rewrite anything, they only accumulate.
+
 ## "I decided not to run this one"
 
 ```
