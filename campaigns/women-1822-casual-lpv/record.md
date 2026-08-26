@@ -21,6 +21,7 @@ duration_days: 5
 created: '2026-08-21'
 amended: '2026-08-26'
 executed: '2026-08-26'
+last_note: '2026-08-26'
 ---
 
 ## Brief (proposed)
@@ -175,3 +176,11 @@ though not for running the test itself, since landing-page views are measured up
 - Ad set ID: 1b993192-30b9-47e5-9e1a-cd0f11607292
 - Ad ID: 7f2b4ccc-a150-480d-9230-3bdc48ea9bfb
 - Deviated from brief: Effective daily spend is Rs 300, not the Rs 1,000 proposed. The ad squad carries Rs 1,000/day but a campaign-level Daily spend cap of Rs 300 was set before launch and the lower figure binds. That is below rules/budget.md's Rs 800-1,200 minimum viable floor, so the delivery algorithm may not exit its learning phase. Treat a weak read as inconclusive rather than as evidence against this audience: the predecessor Female 18-22-LPV holds the account's best tap rate (20.9%, n=110) and was starved at ~Rs 44/day, which is the exact failure this recommendation was written to correct. Raising or clearing the campaign cap is what makes the result readable. Also created via ad-agent snap-push rather than by hand — first API-created ad set in this ledger.
+
+## Note — observation (2026-08-26)
+
+Post-launch tracking check PASSED at 15:53 UTC, 38 minutes after enable. 65 landing-page views on /get/w, all joined to ad set id 1b993192-30b9-47e5-9e1a-cd0f11607292 on network=snap. Nothing fell through to the page's get_w_lp default. This is the first ad-level attribution this account has ever had working — the 2026-08-21 incident had 0 of 54 installs carrying an ad identifier. Writing utm_id literally from the real ad id via snap-push, rather than relying on a {{ad.id}} macro, is what closed it.
+
+Delivery is far faster than planned: 16,941 impressions and Rs 105 of the Rs 300 daily cap consumed in 38 minutes. At that pace the cap is exhausted inside about two hours and the ad set goes dark until midnight, so each day is one short burst rather than steady delivery.
+
+Two consequences for how this gets read. First, budget.md's kill/double gate of 50-100 landing-page views was reached in 38 minutes, far sooner than that rule anticipated — but the ad set is still flagged LEARNING_PHASE by Snap, so reviewing now would judge it on delivery the algorithm has not finished calibrating. The gate needs 'and out of learning phase', not just a view count. Second, store taps are 1 of 65 views. That is a single event and says nothing yet; it is recorded so the next reader knows it was seen and deliberately not treated as a signal.
