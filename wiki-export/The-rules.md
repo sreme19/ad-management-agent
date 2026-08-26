@@ -17,8 +17,9 @@ flowchart TB
     Tracking["rules/tracking.md\nUTM scheme, pre-/post-launch\nverification checklist"]
     Generation["rules/creative-generation.md\nPOV rule, Grok prompt skeleton,\nnegative list, QA gate"]
     Destinations["rules/destinations.yaml\nwhose POV each landing page\noccupies — enforced in code"]
+    Networks["rules/networks.yaml\nper-network UTM conventions,\nand what may be created — read by the code"]
 
-    Setup["ad-setup-loop"] --> Compliance & Targeting & Creative & Generation & Destinations & Naming & Budget & Tracking
+    Setup["ad-setup-loop"] --> Compliance & Targeting & Creative & Generation & Destinations & Networks & Naming & Budget & Tracking
     Audit["ad-audit"] --> Budget
     Ideation["ad-ideation"] --> Compliance & Targeting & Creative & Budget
     Intake["ad-intake"] --> Compliance & Creative & Generation
@@ -95,7 +96,7 @@ verdict of `pass`, `regenerate` (naming the prompt clause to change), or `escala
 which is the app owner's decision). Per `compliance.md`, that check is a separate pass from the one that
 wrote the prompt.
 
-## `rules/destinations.yaml` &mdash; the one rule file the code enforces itself
+## `rules/destinations.yaml` &mdash; a rule file the code enforces itself
 
 Every other file under `rules/` is read by a skill and applied with judgment. This one backs a **hard
 gate in the CLI**: `ad-agent propose` refuses to write a record whose ad-set audience doesn't match the
@@ -168,3 +169,33 @@ checks are non-negotiable parts of `ad-setup-loop`'s procedure, not optional fol
   in `SPEC.md` itself
 - [Agent registry](Agent-Registry) &mdash; which skill reads which file, traced through the actual
   procedure steps
+
+## `rules/networks.yaml` &mdash; the other rule file the code reads directly
+
+Added 2026-08-26, deliberately **before** a third network was added rather than after. Until then
+`snap` and `meta` were a two-value list hardcoded in four places, and `utm_source: "snapchat"` was a
+string typed into a Snap-only function.
+
+A network is not a string. It is four things, and two of them already differ between the two networks
+in ways that have caused real bugs:
+
+| | why it is here |
+|---|---|
+| `utm_source` | Snap's key is `snap` and its `utm_source` is `snapchat`. That mismatch is why only 7 of 151 signups could be joined to an ad set carrying cost. Both spellings are known in this repo and nowhere else. |
+| `ad_join_param` | The analytics reads `utm_id` as the ad id on Snap and `utm_content` on Meta. Crossing them silently breaks ad-level attribution. |
+| `ad_set_join_param` | Which parameter carries the ad-set id. |
+| `creation` | `none`, or `paused-only`. |
+
+**The `creation` field can only ever refuse**, and that distinction is the whole reason it is allowed
+to live in an editable text file. The code consults it *in addition to* its own checks, never instead
+of them. Setting `meta: creation: paused-only` grants nothing — `snap-push` refuses a non-Snap record
+before it ever reads the registry, there is no Meta client to call, and no Meta credential exists to
+call it with. What actually holds the paused-only line is the absence of credentials and the
+transport-layer refusal in `snap.py`. See [Why it's built this way](Safety-and-guardrails).
+
+The file leads with the argument against using it. `rules/budget.md` puts minimum viable spend at
+&#8377;800&ndash;1,200/day per ad set against a &#8377;50,000/month envelope &mdash; one or two properly
+funded ad sets at a time. Adding a network does not add reach; it splits the same money below the
+floor, which is the exact failure the current live women's record exists to correct. A new network
+also has to be taught to `pocket-dating-coach`, or its spend cannot join to its traffic &mdash; and
+that join is already broken for the two networks here.

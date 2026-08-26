@@ -16,13 +16,31 @@ import urllib.request
 from pathlib import Path
 
 from . import budget as budgetrules
-from . import destinations, research as researchmod, snap as snapapi, targeting as targetingspec
+from . import destinations, networks as networkreg, research as researchmod
+from . import snap as snapapi, targeting as targetingspec
 from .config import load_config
 from .ledger import STATUSES, Ledger
 
 
 def _today() -> str:
     return _dt.date.today().isoformat()
+
+
+def _check_network(rules_dir: Path, network: str) -> None:
+    """Validate --network against the registry, at run time.
+
+    Not an argparse `choices=` list, because the parser is built before config is
+    loaded and so cannot know where the registry lives — and because a hardcoded
+    pair here is exactly what this registry exists to remove. The runtime error
+    carries the registered names and points at the file.
+    """
+    try:
+        networkreg.get(rules_dir, network)
+    except networkreg.NetworkError as exc:
+        _fail(exc)
+
+
+NETWORK_HELP = "network key from rules/networks.yaml (currently: snap, meta)"
 
 
 def _add_targeting_flags(sp: argparse.ArgumentParser, *, required: bool) -> None:
@@ -105,6 +123,8 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"note: {budgetrules.floor_note(args.budget_cap)}\n"
               "      Proposing anyway — the cap is your call, but say why in the brief.",
               file=sys.stderr)
+
+    _check_network(ledger.root / "rules", args.network)
 
     rec = ledger.propose(
         slug=args.slug,
@@ -279,23 +299,24 @@ def _gate_campaign_caps(caps: dict, *, squad_daily_inr: float, duration_days: in
     print("\n--accept-campaign-cap: proceeding with the cap above as a stated deviation.")
 
 
-def _utm_url(destination: str, campaign_name: str, ad_squad_id: str,
-             ad_id: str, ad_name: str) -> str:
+def _utm_url(rules_dir: Path, network: str, destination: str, campaign_name: str,
+             ad_squad_id: str, ad_id: str, ad_name: str) -> str:
     """rules/tracking.md's scheme, with every value literal.
 
     Ads Manager fills these from {{macros}}; the 2026-08-21 incident was a macro
     that silently never resolved. Pushed through the API the ids are known facts by
     the time the URL is written, so there is no macro left to fail.
+
+    The parameter names come from rules/networks.yaml rather than from literals
+    here, because Snap and Meta genuinely disagree about which one carries the ad
+    id and this function is one copy-paste away from being reused for the wrong
+    one.
     """
     from urllib.parse import urlencode
-    return destination + "?" + urlencode({
-        "utm_source": "snapchat",
-        "utm_medium": "paid_social",
-        "utm_campaign": campaign_name,
-        "utm_term": ad_squad_id,
-        "utm_id": ad_id,
-        "utm_content": ad_name,
-    })
+    return destination + "?" + urlencode(
+        networkreg.utm_params(rules_dir, network, campaign_name=campaign_name,
+                              ad_set_id=ad_squad_id, ad_id=ad_id, ad_name=ad_name)
+    )
 
 
 def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
@@ -303,9 +324,17 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
     rec = ledger.find(args.rec_id)
     fm = rec.front_matter
 
+    # Two checks, deliberately. This command only knows how to talk to Snap, and
+    # separately the registry has to declare that creating on it is permitted at
+    # all. The registry can only tighten this — editing it cannot teach this
+    # function a second API.
     if fm.get("network") != "snap":
         print(f"error: {args.rec_id} is network={fm.get('network')!r}, not snap", file=sys.stderr)
         raise SystemExit(2)
+    try:
+        networkreg.require_creation(ledger.root / "rules", "snap", mode="paused-only")
+    except networkreg.NetworkError as exc:
+        _fail(exc)
     if fm.get("status") != "proposed":
         print(f"error: {args.rec_id} is {fm.get('status')!r}; push expects 'proposed'.\n"
               "A record that is already live has real ids — pushing again would create "
@@ -419,7 +448,8 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
     print(f"media     uploaded {media['id']}")
 
     # utm_id needs the ad id, which does not exist yet; the URL is rewritten below.
-    provisional = _utm_url(fm["destination_url"], fm["campaign_name"], squad["id"], "", fm["ad_name"])
+    provisional = _utm_url(ledger.root / "rules", "snap", fm["destination_url"],
+                           fm["campaign_name"], squad["id"], "", fm["ad_name"])
     creative = client.create_creative(name=fm["ad_name"], media_id=media["id"],
                                       headline=args.headline, brand_name="Riteangle",
                                       url=provisional,
@@ -429,8 +459,8 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
     ad = client.create_ad(name=fm["ad_name"], ad_squad_id=squad["id"], creative_id=creative["id"])
     print(f"ad        created {ad['id']}")
 
-    final_url = _utm_url(fm["destination_url"], fm["campaign_name"], squad["id"],
-                         ad["id"], fm["ad_name"])
+    final_url = _utm_url(ledger.root / "rules", "snap", fm["destination_url"],
+                         fm["campaign_name"], squad["id"], ad["id"], fm["ad_name"])
     client.set_creative_url(creative, final_url)
     print("creative  landing URL rewritten with the real ad id")
 
@@ -474,6 +504,7 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
 
 
 def cmd_log_setup(args: argparse.Namespace, ledger: Ledger) -> None:
+    _check_network(ledger.root / "rules", args.network)
     rec = ledger.log_setup(
         args.rec_id,
         network=args.network,
@@ -749,6 +780,7 @@ def cmd_answer(args: argparse.Namespace, ledger: Ledger) -> None:
 
 
 def cmd_idea(args: argparse.Namespace, ledger: Ledger) -> None:
+    _check_network(ledger.root / "rules", args.network)
     if budgetrules.below_floor(args.est_daily):
         print(f"note: {budgetrules.floor_note(args.est_daily)}\n"
               "      An idea costed below the floor is proposing a system check, not a test.",
@@ -1110,6 +1142,9 @@ def cmd_fetch_analytics(args: argparse.Namespace, config: dict) -> None:
         )
         raise SystemExit(1)
 
+    if args.network not in ("all", "other"):
+        _check_network(Path(config["ledger"]["root"]) / "rules", args.network)
+
     qs = (
         f"?start={args.start}&end={args.end}&currency={args.currency}"
         f"&network={args.network}&audience={args.audience}"
@@ -1135,7 +1170,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("propose", help="Record a mode-5 recommendation before you execute it")
     sp.add_argument("slug", help="short campaign slug, used as the ledger folder name")
-    sp.add_argument("--network", required=True, choices=["snap", "meta"])
+    sp.add_argument("--network", required=True, help=NETWORK_HELP)
     sp.add_argument("--campaign-name", required=True)
     sp.add_argument("--ad-set-name", required=True)
     sp.add_argument("--ad-name", required=True)
@@ -1192,7 +1227,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("log-setup", help="Record the real IDs after setting the ad up by hand")
     sp.add_argument("rec_id")
-    sp.add_argument("--network", required=True, choices=["snap", "meta"])
+    sp.add_argument("--network", required=True, help=NETWORK_HELP)
     sp.add_argument("--campaign-id", required=True)
     sp.add_argument("--ad-set-id", required=True)
     sp.add_argument("--ad-id", required=True)
@@ -1327,7 +1362,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp.add_argument("--title", required=True)
     sp.add_argument("--verdict", required=True, choices=list(researchmod.IDEA_VERDICTS))
-    sp.add_argument("--network", required=True, choices=["snap", "meta"])
+    sp.add_argument("--network", required=True, help=NETWORK_HELP)
     sp.add_argument("--persona", required=True, help="from rules/targeting.md")
     sp.add_argument("--est-daily", required=True, type=float, help="INR per day to test it")
     sp.add_argument("--est-days", required=True, type=int)
@@ -1363,7 +1398,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--start", required=True, help="YYYY-MM-DD, IST day, inclusive")
     sp.add_argument("--end", required=True, help="YYYY-MM-DD, IST day, inclusive")
     sp.add_argument("--currency", default="INR", choices=["INR", "USD"])
-    sp.add_argument("--network", default="all", choices=["all", "snap", "meta", "other"])
+    sp.add_argument("--network", default="all",
+                    help="all, other, or a key from rules/networks.yaml")
     sp.add_argument("--audience", default="all", choices=["all", "men", "women", "unknown"])
     sp.add_argument("--out", default=None, help="write JSON here instead of stdout")
     sp.set_defaults(func=cmd_fetch_analytics)

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
-from conftest import run
+from conftest import REPO, run
 
 from ad_management_agent import cli
 
@@ -15,8 +15,9 @@ class TestUtmUrl:
     week of Snap spend in unattributable installs.
     """
 
-    def url(self):
-        return cli._utm_url("https://www.riteangle.dating/get/w",
+    def url(self, network="snap"):
+        return cli._utm_url(REPO / "rules", network,
+                            "https://www.riteangle.dating/get/w",
                             "RA_TRAFFIC_GET_IN_PAN_TOF_202608",
                             "squad-uuid", "ad-uuid", "STORY_FOURTEEN-SUITORS_A_20260824")
 
@@ -44,6 +45,19 @@ class TestUtmUrl:
 
     def test_the_path_is_preserved(self):
         assert urlsplit(self.url()).path == "/get/w"
+
+    def test_meta_puts_the_ad_id_where_meta_reads_it(self):
+        # traffic-quality.ts reads utm_content as the ad-level id on Meta and
+        # utm_id on Snap. Writing the ad *name* into utm_content, as the single
+        # template in tracking.md literally shows, would break the Meta join.
+        q = parse_qs(urlsplit(self.url("meta")).query)
+        assert q["utm_content"] == ["ad-uuid"]
+        assert q["utm_source"] == ["meta"]
+
+    def test_snap_keeps_both_the_id_and_the_readable_name(self):
+        q = parse_qs(urlsplit(self.url("snap")).query)
+        assert q["utm_id"] == ["ad-uuid"]
+        assert q["utm_content"] == ["STORY_FOURTEEN-SUITORS_A_20260824"]
 
 
 class TestCommandsStayDocumented:

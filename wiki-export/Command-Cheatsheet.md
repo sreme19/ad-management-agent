@@ -59,7 +59,7 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 #### `propose`
 
 ```
-ad-agent propose [-h] --network {snap,meta} --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
+ad-agent propose [-h] --network NETWORK --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
 ```
 
 #### `snap-push`
@@ -77,7 +77,7 @@ ad-agent amend [-h] --reason REASON [--campaign-name CAMPAIGN_NAME] [--ad-set-na
 #### `log-setup`
 
 ```
-ad-agent log-setup [-h] --network {snap,meta} --campaign-id CAMPAIGN_ID --ad-set-id AD_SET_ID --ad-id AD_ID [--deviated DEVIATED] rec_id
+ad-agent log-setup [-h] --network NETWORK --campaign-id CAMPAIGN_ID --ad-set-id AD_SET_ID --ad-id AD_ID [--deviated DEVIATED] rec_id
 ```
 
 #### `note`
@@ -161,7 +161,7 @@ ad-agent answer [-h] --text TEXT [--learning LEARNING] [--dropped] question_id
 #### `idea`
 
 ```
-ad-agent idea [-h] --title TITLE --verdict {recommend,hold} --network {snap,meta} --persona PERSONA --est-daily EST_DAILY --est-days EST_DAYS --rationale RATIONALE [--learning LEARNING] [--blocked-on BLOCKED_ON] [--slug SLUG]
+ad-agent idea [-h] --title TITLE --verdict {recommend,hold} --network NETWORK --persona PERSONA --est-daily EST_DAILY --est-days EST_DAYS --rationale RATIONALE [--learning LEARNING] [--blocked-on BLOCKED_ON] [--slug SLUG]
 ```
 
 #### `open`
@@ -179,7 +179,7 @@ ad-agent commands [-h] [--write] [--check]
 #### `fetch-analytics`
 
 ```
-ad-agent fetch-analytics [-h] --start START --end END [--currency {INR,USD}] [--network {all,snap,meta,other}] [--audience {all,men,women,unknown}] [--out OUT]
+ad-agent fetch-analytics [-h] --start START --end END [--currency {INR,USD}] [--network NETWORK] [--audience {all,men,women,unknown}] [--out OUT]
 ```
 <!-- END GENERATED: ad-agent commands -->
 

@@ -51,9 +51,15 @@ weight instead. See `SPEC.md` decisions #3 and #10 for the full reasoning.
 - `rules/budget.md` — the operating envelope, the minimum viable daily spend, and the kill/double rule.
   Its three enforceable figures are mirrored in `budget.py`, which is the only place code reads them
   from — change both in the same commit.
-- `rules/destinations.yaml` — the destination registry. **The one rule file the CLI reads directly**,
-  because it backs a hard gate: `propose` refuses to point an ad set at a page written for a different
-  audience, and there is no override flag.
+- `rules/destinations.yaml` — the destination registry. Backs a hard gate: `propose` refuses to point
+  an ad set at a page written for a different audience, and there is no override flag.
+- `rules/networks.yaml` — the network registry. What each network's UTM conventions are, which
+  parameter its analytics joins the ad on (Snap and Meta genuinely differ), and whether this agent may
+  create anything on it. **That last field can only ever refuse** — it is consulted in addition to a
+  command's own checks, never instead of them, so editing it cannot grant a capability.
+
+`destinations.yaml` and `networks.yaml` are the two rule files the CLI reads directly; everything else
+under `rules/` is prose a skill reads live.
 - `rules/tracking.md` — the UTM parameters every ad must carry and the pre-/post-launch verification
   checklist; a 2026-08-21 incident lost a week of Snap spend to unattributable installs by skipping it.
 
@@ -136,7 +142,7 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 #### `propose`
 
 ```
-ad-agent propose [-h] --network {snap,meta} --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
+ad-agent propose [-h] --network NETWORK --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL --budget-cap BUDGET_CAP --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
 ```
 
 #### `snap-push`
@@ -154,7 +160,7 @@ ad-agent amend [-h] --reason REASON [--campaign-name CAMPAIGN_NAME] [--ad-set-na
 #### `log-setup`
 
 ```
-ad-agent log-setup [-h] --network {snap,meta} --campaign-id CAMPAIGN_ID --ad-set-id AD_SET_ID --ad-id AD_ID [--deviated DEVIATED] rec_id
+ad-agent log-setup [-h] --network NETWORK --campaign-id CAMPAIGN_ID --ad-set-id AD_SET_ID --ad-id AD_ID [--deviated DEVIATED] rec_id
 ```
 
 #### `note`
@@ -238,7 +244,7 @@ ad-agent answer [-h] --text TEXT [--learning LEARNING] [--dropped] question_id
 #### `idea`
 
 ```
-ad-agent idea [-h] --title TITLE --verdict {recommend,hold} --network {snap,meta} --persona PERSONA --est-daily EST_DAILY --est-days EST_DAYS --rationale RATIONALE [--learning LEARNING] [--blocked-on BLOCKED_ON] [--slug SLUG]
+ad-agent idea [-h] --title TITLE --verdict {recommend,hold} --network NETWORK --persona PERSONA --est-daily EST_DAILY --est-days EST_DAYS --rationale RATIONALE [--learning LEARNING] [--blocked-on BLOCKED_ON] [--slug SLUG]
 ```
 
 #### `open`
@@ -256,7 +262,7 @@ ad-agent commands [-h] [--write] [--check]
 #### `fetch-analytics`
 
 ```
-ad-agent fetch-analytics [-h] --start START --end END [--currency {INR,USD}] [--network {all,snap,meta,other}] [--audience {all,men,women,unknown}] [--out OUT]
+ad-agent fetch-analytics [-h] --start START --end END [--currency {INR,USD}] [--network NETWORK] [--audience {all,men,women,unknown}] [--out OUT]
 ```
 <!-- END GENERATED: ad-agent commands -->
 

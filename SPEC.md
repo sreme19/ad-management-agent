@@ -300,6 +300,29 @@ Four properties are load-bearing:
   own research and live data 120, platform docs 180. `open` reports what is past due, and reports a
   stale claim as unverified rather than as wrong.
 
+## Networks (registry — the second rule file the CLI reads directly)
+
+**Added 2026-08-26, before any new platform rather than after one.** `snap` and `meta` were a
+two-value enum hardcoded in four argparse calls, plus a `utm_source: "snapchat"` string literal inside
+a Snap-only function. A network is not a string: it is a UTM convention, a join key, an analytics
+label, and a statement about whether this agent may create anything on it — and two of those already
+differ between the two networks in ways that have caused real bugs. Snap's analytics key is `snap`
+while its `utm_source` is `snapchat`, which is why only 7 of 151 signups could be joined to a costed
+ad set; and `traffic-quality.ts` reads `utm_id` as the ad id on Snap but `utm_content` on Meta.
+
+Adding a network is now an entry in `rules/networks.yaml` plus a client module, not a scatter of new
+string literals. The file leads with the reason not to add one: `rules/budget.md`'s ₹800–1,200/day
+floor against a ₹50,000/month envelope funds one or two properly funded ad sets at a time, so a new
+network splits the same money below the floor rather than adding reach — and it has to be taught to
+`pocket-dating-coach` too, or its spend cannot join to its traffic.
+
+**The `creation` field can only ever refuse.** `networks.require_creation` is called *in addition to*
+a command's own hardcoded network check, never instead of it. Flipping `meta` to `paused-only` in the
+yaml grants nothing: `snap-push` still refuses a non-`snap` record before it consults the registry,
+there is no Meta client, and there is no Meta credential (decision #10). The registry declares intent
+and can tighten; the absence of credentials and `snap.py`'s transport-layer refusal are what hold.
+`tests/test_networks.py` asserts both directions.
+
 ## Rules (single source of truth — read live, edited in place when refined)
 
 Living under `rules/`, read by every skill rather than restated in the skill files — the same pattern

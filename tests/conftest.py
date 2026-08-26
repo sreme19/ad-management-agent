@@ -21,7 +21,9 @@ REPO = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def ledger_root(tmp_path, monkeypatch) -> Path:
     (tmp_path / "rules").mkdir()
-    for name in ("destinations.yaml", "targeting.md"):
+    # networks.yaml and destinations.yaml are the two rule files the CLI reads
+    # directly, so a fixture ledger is not usable without them.
+    for name in ("destinations.yaml", "networks.yaml", "targeting.md"):
         shutil.copy(REPO / "rules" / name, tmp_path / "rules" / name)
 
     creative = tmp_path / "creatives" / "test-asset"

@@ -1,0 +1,78 @@
+# Network registry — machine-readable, read by the CLI
+#
+# The second rule file the CLI reads directly, alongside destinations.yaml.
+# Everything else under rules/ is prose a skill reads live.
+#
+# Why it exists: `snap` and `meta` were a two-value enum hardcoded in four
+# argparse calls, and `utm_source: snapchat` was a string literal inside a
+# Snap-only function. That is fine for exactly two networks and stops being fine
+# the moment a third is discussed — a network is not a string, it is a UTM
+# convention, a join key, an analytics label, and a statement about whether this
+# agent may create anything on it at all. Those four things were scattered, and
+# two of them already disagree between the networks in ways that have caused real
+# bugs.
+#
+# Adding a network is a change here plus a client module. It is NOT a scatter of
+# new string literals.
+#
+# --- READ THIS BEFORE ADDING ONE ---------------------------------------------
+# rules/budget.md puts minimum viable spend at Rs 800-1,200/day per active ad set
+# against a Rs 50,000/month envelope. That funds one or two properly funded ad
+# sets at a time. Adding networks does not add reach; it splits the same money
+# below the floor, which is the exact failure the current live women's record
+# exists to correct. A new network also has to be taught to pocket-dating-coach,
+# or its spend cannot join to its traffic — and that join is already broken for
+# the two networks here.
+#
+# --- FIELDS -------------------------------------------------------------------
+# label            human name, for printed output
+# utm_source       what goes in the URL's utm_source. NOT always the key above:
+#                  Snap's key is `snap` and its utm_source is `snapchat`, and
+#                  that mismatch is why only 7 of 151 signups could be joined to
+#                  a costed ad set. Recorded here because this repo is the only
+#                  place both spellings are known; the normalisation itself
+#                  belongs to pocket-dating-coach.
+# ad_join_param    which UTM parameter the analytics reads as the AD id. Snap and
+#                  Meta genuinely differ. Crossing them silently breaks ad-level
+#                  attribution — see rules/tracking.md.
+# ad_set_join_param  which parameter carries the ad-set id.
+# creation         what this agent may create: `none` or `paused-only`.
+#                  This field can only ever REFUSE. It is a declaration of intent
+#                  that the code consults in addition to its own hardcoded checks,
+#                  never instead of them — flipping meta to `paused-only` here
+#                  grants nothing, because there is no Meta client and no Meta
+#                  credential (SPEC.md decision #10). The real guarantees are the
+#                  absence of credentials and snap.py's transport-layer refusal.
+# credentials      where this network's credentials live, or false if none exist.
+
+networks:
+  snap:
+    label: Snapchat
+    utm_source: snapchat
+    ad_join_param: utm_id
+    ad_set_join_param: utm_term
+    creation: paused-only
+    credentials: config.local.yaml -> snap.*
+    note: >-
+      Creation was permitted by the app owner on 2026-08-26 (SPEC.md decision #3,
+      as amended) and is paused-only: snap-push creates campaigns, ad squads,
+      creatives and ads with status PAUSED, reads each back and diffs it against
+      the plan. It cannot enable anything or change a live budget, refused in
+      SnapClient._call rather than by convention. utm_id must be set explicitly on
+      each ad's own Website URL field — assuming Snap appends it cost a week of
+      unattributable spend on 2026-08-21.
+
+  meta:
+    label: Meta
+    utm_source: meta
+    ad_join_param: utm_content
+    ad_set_join_param: utm_term
+    creation: none
+    credentials: false
+    note: >-
+      Entirely hands-off and unamended. No Ads Manager call, no Marketing API
+      credential in this repo. Setup is a human executing ad-setup-loop's output
+      by hand. Note the join difference: Meta reads utm_content as the ad-level id
+      where Snap reads utm_id, per traffic-quality.ts. utm_content carries a
+      human-readable ad name on Snap and is load-bearing on Meta, so a change to
+      what that parameter holds is safe on one network and breaking on the other.
