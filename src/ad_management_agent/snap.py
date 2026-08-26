@@ -223,8 +223,29 @@ class SnapClient:
 
     # ---- ad squad --------------------------------------------------------
     def create_adsquad(self, *, name, campaign_id, targeting, daily_budget_inr,
-                       start_time, end_time) -> dict:
+                       start_time, end_time, pixel_id) -> dict:
+        """Create the ad squad, PAUSED.
+
+        `pixel_id` is required because every other LANDING_PAGE_VIEW squad in this
+        account carries the same one, and the first squad this command created did
+        not. A mismatch with the account's own convention is far more likely an
+        omission than a deliberate choice, so it fails rather than passing quietly.
+
+        Note what the pixel is NOT responsible for: Snap counts landing-page views
+        for a WEB_VIEW ad natively, by rendering the page in its own in-app browser,
+        and reported 59 of them for the pixel-less first run. So a missing pixel does
+        not blind the optimisation goal. It was briefly diagnosed that way here, from
+        a `conversion_page_views: 0` reading against the wrong stats field, and that
+        was wrong.
+        """
+        if not pixel_id:
+            raise SnapError(
+                "pixel_id is required for a LANDING_PAGE_VIEW ad squad.\n"
+                "Without it Snap cannot see the conversion it is being asked to "
+                "optimise for. Set snap.pixel_id in config.local.yaml."
+            )
         res = self.post(f"/campaigns/{campaign_id}/adsquads", {"adsquads": [{
+            "pixel_id": pixel_id,
             "name": name,
             "campaign_id": campaign_id,
             "type": "SNAP_ADS",

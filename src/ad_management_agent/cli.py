@@ -334,7 +334,9 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
 
     start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
     end = start + _dt.timedelta(days=int(fm["duration_days"]))
-    iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S.000Z")  # noqa: E731
+    def iso(d):
+        return d.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
     budget = float(fm["budget_cap_inr_per_day"])
 
     spec = fm.get("targeting")
@@ -356,8 +358,8 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
 
     plan = [
         ("campaign   ", fm["campaign_name"]),
-        ("ad squad   ", f'{fm["ad_set_name"]}  Rs {budget:.0f}/day x {fm["duration_days"]}d, '
-                        f'LANDING_PAGE_VIEW, AUTO_BID'),
+        ("ad squad   ", (f'{fm["ad_set_name"]}  Rs {budget:.0f}/day x '
+                         f'{fm["duration_days"]}d, LANDING_PAGE_VIEW, AUTO_BID')),
         ("ad         ", fm["ad_name"]),
         ("creative   ", f'{asset.name}  headline={args.headline!r}  CTA=MORE'),
         ("destination", fm["destination_url"]),
@@ -409,7 +411,8 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
 
     squad = client.create_adsquad(name=fm["ad_set_name"], campaign_id=campaign["id"],
                                   targeting=targeting, daily_budget_inr=budget,
-                                  start_time=iso(start), end_time=iso(end))
+                                  start_time=iso(start), end_time=iso(end),
+                                  pixel_id=(config.get("snap") or {}).get("pixel_id"))
     print(f"ad squad  created {squad['id']}")
 
     media = client.upload_media(f'{fm["ad_name"]}_MEDIA', asset)
