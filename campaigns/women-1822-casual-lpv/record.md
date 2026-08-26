@@ -15,11 +15,11 @@ targeting_summary: 'Snapchat, women only, 18-22, pan-India, Android-weighted. CA
   broader-audiences-win note for LPV objectives; BLR-narrow women''s set underperformed).
   Success metric: landing-page views, not signups.'
 creative_ref: creatives/fourteen-suitors-w1822
-destination_url: https://www.riteangle.dating/get
+destination_url: https://www.riteangle.dating/get/w
 budget_cap_inr_per_day: 1000.0
 duration_days: 5
 created: '2026-08-21'
-amended: '2026-08-24'
+amended: '2026-08-26'
 ---
 
 ## Brief (proposed)
@@ -161,3 +161,8 @@ though not for running the test itself, since landing-page views are measured up
 - Reason: Hook slug ATTENTION-SEEKERS is not in creative-style.md's ad-ready-threads vocabulary, which naming.md requires [HOOK] to draw from; the real hook is the flood. Repointing creative_ref at the prompt pack written 2026-08-24.
 - `ad_name`: 'STORY_ATTENTION-SEEKERS_A_20260821' → 'STORY_FOURTEEN-SUITORS_A_20260824'
 - `creative_ref`: 'creatives/story-attention-seekers-a' → 'creatives/fourteen-suitors-w1822'
+
+## Amendment (2026-08-26)
+
+- Reason: The women's destination now exists and is verified. /get/w deployed 2026-08-25, beacon endpoints fixed 2026-08-26 (pocket-dating-coach e9b45a83), tracking.md pre-launch checks passed against the live URL.
+- `destination_url`: 'https://www.riteangle.dating/get' → 'https://www.riteangle.dating/get/w'

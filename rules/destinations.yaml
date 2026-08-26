@@ -39,17 +39,23 @@ destinations:
 
   /get/w:
     audience: women
-    paid_traffic: false
-    verified: 2026-08-25
+    paid_traffic: true
+    verified: 2026-08-26
     note: >-
       The women's variant of /get, built 2026-08-25. Same route file, audience
       switched off the path segment; her page leads with the ordered list and
       carries the vetting second, and verification is framed as something she
       receives rather than performs. Copy verified by reading the rendered page.
-      paid_traffic is false ONLY because it is not deployed yet — riteangle.dating
-      /get/w still 404s. Flip this to true once it is live and the tracking.md
-      pre-launch check has been run against the real URL. That one-word change is
-      what unblocks rec-2026-08-21-women-1822-casual-lpv.
+      Deployed 2026-08-25 (pocket-dating-coach d1b04182) and opened to paid traffic
+      2026-08-26 after tracking.md's checks passed against the live URL: /get 200,
+      /get/w 200, /get/xyz 404; her copy confirmed; the Play referrer carries
+      ra_lp=get_w plus every utm_*; a real phone visit recorded a view under its
+      own campaign on network=snap and joined to its tap in visitFunnel.
+      Opening it also required pocket-dating-coach e9b45a83 — d1b04182 had updated
+      the DB constraint and the LandingPage type but not the two beacon endpoints,
+      so every view on this page was being silently discarded and every tap filed
+      under /get. Views are this audience's success metric, so that would have
+      spent the budget and measured a permanent zero.
 
   /beta:
     audience: women
