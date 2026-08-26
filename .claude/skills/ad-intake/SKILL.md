@@ -25,11 +25,48 @@ shows.
 4. **Check it against `rules/compliance.md` before drawing any lesson from it.** A competitor doing
    something Riteangle's product rules forbid (implying money/provider energy, an unverified claim, a
    real male photo) is a lesson in what *not* to copy, not a template.
-5. **Decide whether this is worth turning into an idea.** If yes, write it up the same way
-   `ad-ideation` would — persona, hook, why now, estimated spend, compliance check, `recommend`/`hold`
-   verdict — and offer to hand it to `ad-setup-loop` if the user approves it. If the lesson is more
-   general (a tone shift, a stat worth stealing the *idea* of quoting, not the number itself), just log
-   the observation plainly rather than forcing it into a formal idea.
+5. **Store what you were given, verbatim.** Before deriving anything, snapshot the raw material —
+   the description, the pasted copy, the notes the user brought:
+   ```
+   ad-agent ingest --title "..." --source competitor-observation|own-research|platform-doc \
+     (--text "..." | --file /path) [--slug short-id]
+   ```
+   Notes are immutable: the content *is* the provenance a claim points back at, so a second ingest
+   under the same id is refused rather than merged. If the source is an image already in your context,
+   write down what you actually see in it — the note is what someone reads in three months, and the
+   screenshot will not be there.
+
+6. **Derive the lesson as a learning**, linked to that note:
+   ```
+   ad-agent learn --claim "..." --subject creative|competitor|channel|audience|product \
+     --source competitor-observation --confidence medium --evidence "..." \
+     --derived-from <note-id> [--slug ...]
+   ```
+   A competitor observation **cannot be `high` confidence** — the gate refuses it. That is deliberate:
+   what a rival is visibly doing is a hypothesis about what works, not a measurement of it.
+
+   This is the step that used to be "just log the observation plainly," with nowhere to log it. An
+   observation that stays in the session teaches nothing, which is precisely how
+   `rules/targeting.md` ended up carrying dated notes with no source attached.
+
+7. **Raise a question if the ad prompts one you cannot answer** — why a format works, what it costs,
+   whether a claim is substantiated:
+   ```
+   ad-agent question --text "..." --kind creative|competitor|channel|... --why "what it unblocks"
+   ```
+
+8. **Decide whether this is worth turning into an idea.** If yes, write it up the way `ad-ideation`
+   does — `ad-agent idea` with persona, spend, `recommend`/`hold`, and `--learning` pointing at what
+   you just derived — and offer to hand it to `ad-setup-loop` if the user approves. If the lesson is
+   more general, the learning above is already the right home for it; don't inflate it into an idea to
+   feel finished.
+
+## Check for it first
+
+Run `ad-agent open` or look through `research/learnings/` before writing a new atom. If this ad
+restates something already recorded, that is `ad-agent log-evidence <lrn-id> --outcome supported
+--text "..."` on the existing claim, not a second file making the same point. `learn` prints existing
+learnings on the same subject for exactly this reason — read them before accepting the new one.
 
 ## What this skill never does
 

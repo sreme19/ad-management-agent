@@ -1,6 +1,6 @@
 ---
 name: ad-setup-loop
-description: Recommend a new ad — campaign/ad-set/ad names, targeting, and creative — for Riteangle's Snap or Meta campaigns, write the recommendation to the ledger, and later log the real IDs once it's set up by hand. Use whenever the user asks to set up an ad, launch a campaign, try a new audience/creative, or asks what to build next after an ad-ideation or ad-intake idea was approved.
+description: Recommend a new ad — campaign/ad-set/ad names, targeting, and creative — for Riteangle's Snap or Meta campaigns, write the recommendation to the ledger, create it on Snap PAUSED via snap-push (never enabled), and log the real IDs once it goes live. Use whenever the user asks to set up an ad, launch a campaign, try a new audience/creative, or asks what to build next after an ad-ideation or ad-intake idea was approved.
 ---
 
 # Setting up an ad (mode 5)
@@ -74,20 +74,51 @@ depend on that file being current.
 7. **Write the brief to a file**, then log the proposal — this is a pure file write, no API call:
    ```
    ad-agent propose <slug> \
-     --network snap|meta \
+     --network <key from rules/networks.yaml> \
      --campaign-name "..." --ad-set-name "..." --ad-name "..." \
      --targeting-summary "..." --creative-ref "creatives/<path-or-id>" \
      --destination-url "https://www.riteangle.dating/<page>" \
      --budget-cap <INR/day> --duration-days <n> \
-     --brief /tmp/brief.md
+     --brief /tmp/brief.md \
+     --gender FEMALE|MALE --min-age <n> --max-age <n|50+> --countries in \
+     [--os ANDROID|IOS] [--expansion on|off] \
+     [--from-idea <idea-id>]
    ```
+   **The record carries its audience twice, and both are required.** `--targeting-summary` is the prose
+   reasoning a human reads; the `--gender`/`--min-age`/`--max-age`/`--countries`/`--os` flags build the
+   normalized block `snap-push` actually pushes. Prose cannot be pushed and a spec cannot explain
+   itself. Two checks will refuse the proposal: `--min-age` below 18 (`rules/compliance.md`, no
+   exceptions), and targeting that disagrees with the gender token in the ad-set name — one of the two
+   is wrong and it is not safe to guess which.
+
+   **If this came from an approved `ad-ideation`/`ad-intake` idea, pass `--from-idea <idea-id>`.** That
+   closes the idea out, so it stops appearing in `ad-agent open` as one nobody acted on.
+
    This prints the generated `rec_id` and the record's path. Show the user the full brief and the
    `rec_id` plainly — that id is what they'll need for the next step.
-8. **Hand it back.** The user sets this up by hand in Ads Manager. Tell them exactly what to name each
-   level and what to paste into targeting/budget fields — this should read like a checklist they can
-   follow without re-deriving anything. Include the full UTM string from `rules/naming.md`/
-   `rules/tracking.md` verbatim as one of the fields to paste — don't make them re-derive it from the
-   scheme.
+8. **Build it, or hand it back — which one depends on the network.**
+
+   **On Snap, offer to create it.** `ad-agent snap-push <rec_id>` creates the campaign, ad squad,
+   creative and ad — **always `PAUSED`** — then reads each object back and diffs it against the plan.
+   Start with `--dry-run`, which prints the plan, checks the parent campaign's spend cap, and creates
+   nothing:
+   ```
+   ad-agent snap-push <rec_id> [--headline "..."] --dry-run
+   ad-agent snap-push <rec_id> [--headline "..."]
+   ```
+   It will refuse a record with no structured targeting, a creative with no recorded QA `pass`, and —
+   the one worth explaining to the user — **an ad squad whose parent campaign carries a lower spend
+   cap.** A campaign-level cap silently overrides a larger ad-squad budget; that is how the first live
+   women's set ended up running at ₹300/day against a ₹1,000/day plan, below `rules/budget.md`'s floor,
+   which made its result inconclusive before a rupee was spent. Fixing the cap in Ads Manager is one
+   click. `--accept-campaign-cap` proceeds anyway as a stated deviation, and prints the `note` command
+   to record it.
+
+   **On Meta, hand it back.** No API call, no credential (`SPEC.md` decision #10, unamended for Meta).
+   Tell the user exactly what to name each level and what to paste into targeting/budget fields — a
+   checklist they can follow without re-deriving anything. Include the full UTM string verbatim as one
+   of the fields to paste; note that Meta reads `utm_content` as the ad-level id where Snap reads
+   `utm_id` (`rules/networks.yaml`), so don't cross the two conventions.
 9. **Pre-launch tracking check — before the ad goes live, every time.** Per `rules/tracking.md`: open
    the ad's actual Website URL field and confirm every macro (`utm_term`, `utm_id`, `utm_content`) is
    present and set at the ad level, then click the ad's own preview/swipe-up link and confirm the
@@ -101,10 +132,13 @@ Once the user says the ad is live (or comes back later with the real IDs), log i
 `ad-audit` later join a real outcome back to this exact recommendation:
 
 ```
-ad-agent log-setup <rec_id> --network snap|meta \
+ad-agent log-setup <rec_id> --network <key> \
   --campaign-id <real> --ad-set-id <real> --ad-id <real> \
   [--deviated "what changed from the brief, and why"]
 ```
+
+After a `snap-push` this command is printed for you with the real ids already filled in — but it is
+still not run until the user has *enabled* the ad, because `live` means spending, not created.
 
 **Then, within the first hour of real traffic, run the post-launch check from `rules/tracking.md`:**
 confirm `pocket-dating-coach`'s `user_acquisition` rows for this network since launch carry the real
@@ -144,5 +178,15 @@ ad-agent abandon <rec_id> --reason "..."
 
 ## The one rule that never changes
 
-Regardless of how good the recommendation is, **you never touch Ads Manager yourself**. Every campaign,
-ad set, and ad gets created by the user's own hand, from the instructions you hand them.
+**You never start spend.** Not by enabling an ad set, not by raising the budget of one already live,
+not on any network. That is the user's action in Ads Manager, every time.
+
+What changed on 2026-08-26, by the app owner's explicit decision: on **Snap** you may now *create*
+objects, and only ever `PAUSED`. On **Meta** nothing at all — no API call, no credential.
+
+Be precise about why the line sits there. A paused object spends nothing, can be inspected in the UI,
+and can be deleted; the moment that matters is not creation but enablement. So the agent does the
+tedious, error-prone part — forty fields typed correctly, every UTM parameter written literally rather
+than as a macro that can silently fail — and never the part where money starts moving. This is enforced
+in `snap.py`, which refuses any outbound request carrying an enabling status or a budget change to an
+existing object, not merely promised here.

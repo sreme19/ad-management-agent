@@ -1090,6 +1090,18 @@ def cmd_commands(args: argparse.Namespace, ledger: Ledger) -> None:
     names = [n for n, _, _ in _subcommands(parser)]
 
     if args.check:
+        # Drift runs both ways. The docs can fall behind the CLI (a command with no
+        # written section), and a skill can run ahead of it (telling a session to
+        # run something that does not exist, or that got renamed). The second is
+        # worse: a wrong doc is confusing, a wrong instruction fails mid-task.
+        import re as _re
+        phantom = []
+        for skill in sorted((ledger.root / ".claude" / "skills").glob("*/SKILL.md")):
+            for token in _re.findall(r"ad-agent\s+([a-z][a-z-]*)",
+                                     skill.read_text(encoding="utf-8")):
+                if token not in names:
+                    phantom.append(f"{skill.parent.name}: `ad-agent {token}` is not a command")
+
         missing_docs, undocumented = [], []
         for rel in COMMANDS_DOCS:
             path = ledger.root / rel
@@ -1103,11 +1115,13 @@ def cmd_commands(args: argparse.Namespace, ledger: Ledger) -> None:
                     undocumented.append(f"{rel}: `{name}` has no hand-written section")
         for row in missing_docs:
             print(f"missing: {row}", file=sys.stderr)
-        for row in undocumented:
+        for row in undocumented + sorted(set(phantom)):
             print(row, file=sys.stderr)
-        if missing_docs or undocumented:
+        if missing_docs or undocumented or phantom:
             raise SystemExit(1)
-        print(f"ok — {len(names)} commands, all documented")
+        skills = len(list((ledger.root / ".claude" / "skills").glob("*/SKILL.md")))
+        print(f"ok — {len(names)} commands, all documented; "
+              f"{skills} skills reference only real ones")
         return
 
     if not args.write:

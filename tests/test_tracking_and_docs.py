@@ -73,6 +73,21 @@ class TestCommandsStayDocumented:
         for name, _, _ in cli._subcommands(parser):
             assert f"`{name}`" in block
 
+    def test_check_catches_a_skill_naming_a_command_that_does_not_exist(
+        self, ledger_root, monkeypatch
+    ):
+        # The worse direction of drift: a stale doc is confusing, a stale
+        # instruction fails mid-task in front of the user.
+        import shutil
+        repo = REPO
+        for rel in ("README.md", "wiki-export/Command-Cheatsheet.md"):
+            (ledger_root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(repo / rel, ledger_root / rel)
+        skill = ledger_root / ".claude" / "skills" / "made-up" / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("Run `ad-agent frobnicate <rec_id>` to finish.\n")
+        assert run(["commands", "--check"]) == 1
+
     def test_check_fails_when_a_command_has_no_section(self, ledger_root, monkeypatch):
         import shutil
         from pathlib import Path

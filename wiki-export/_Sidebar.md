@@ -1,7 +1,7 @@
 **ad-management-agent**
 
 - [Home](Home)
-- [How the four modes work](How-the-four-modes-work)
+- [How the modes work](How-the-four-modes-work)
 - [The ledger](The-ledger)
 - [The research loop](The-research-loop)
 - [The rules](The-rules)

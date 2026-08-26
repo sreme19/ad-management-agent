@@ -6,18 +6,20 @@ anywhere in this repo.** The actual reasoning (targeting, creative, research) ha
 Claude Code session is running one of the skills below; this repo's CLI only persists results
 deterministically. See `SPEC.md` for the full architecture and every locked decision behind it.
 
-## The four modes
+## The modes
 
 | Skill | Mode | What it does |
 |---|---|---|
-| `ad-setup-loop` | 5 | Recommend campaign/ad-set/ad names, targeting, and creative for a new ad; log the recommendation; later log the real IDs once it's set up by hand. |
-| `ad-audit` | 6 | Pull live performance data, join it back to the ledger, write a working/not-working/inconclusive verdict against each recommendation. |
+| `ad-setup-loop` | 5 | Recommend campaign/ad-set/ad names, targeting, and creative; log the recommendation; create it on Snap `PAUSED`; log the real IDs once it goes live. |
+| `ad-audit` | 6 | Pull live performance data, join it back to the ledger, write a working/not-working/inconclusive verdict — which propagates to the creative's prompt pack and the learnings behind it. |
 | `ad-ideation` | 7 | Deep research into what to try next; every idea ends in a recommend/hold verdict with an estimated spend. Approval hands off to `ad-setup-loop`. |
-| `ad-intake` | 8 | Learn from an ad you found elsewhere (screenshot, competitor link); optionally turn it into an idea. |
+| `ad-intake` | 8 | Learn from an ad you found elsewhere (screenshot, competitor link); ingest it, derive the lesson, optionally turn it into an idea. |
+| `ad-research` | 9 | Work an open question, ingest notes you bring in, derive durable learnings into `research/`. |
 
-All four are manual-trigger-only for now — ask for what you want in a Claude Code session rooted here
-("set up an ad for the casual-selective women persona," "how are the live ads doing," "find me some new
-ideas," "look at this ad I found") and the relevant skill runs.
+All are manual-trigger-only — ask for what you want in a Claude Code session rooted here ("set up an ad
+for the casual-selective women persona," "how are the live ads doing," "find me some new ideas," "look
+at this ad I found," "here are my notes on Truecaller") and the relevant skill runs. You should never
+need to remember a skill's name; describing the task is the interface.
 
 ### What this agent may and may not touch
 

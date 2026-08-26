@@ -1,9 +1,10 @@
-# How the four modes work
+# How the modes work
 
 There is no single "run everything" command. Each mode is a Claude Code **skill** you invoke by asking
 for what you want in a session rooted in this repo &mdash; "set up an ad for the casual-selective women
-persona," "how are the live ads doing," "find me some new ideas," "look at this ad I found." The four
-modes chain into one loop, but nothing advances automatically from one to the next; a person decides
+persona," "how are the live ads doing," "find me some new ideas," "look at this ad I found," "here are
+my notes on Truecaller." You should never need to remember a skill's name: describing the task is the
+interface. The modes chain into one loop, but nothing advances automatically from one to the next; a person decides
 when to move forward at every step.
 
 ```mermaid
@@ -89,3 +90,23 @@ does.
 - [The rules](The-rules) &mdash; the files every mode reads before doing anything
 - [Agent registry](Agent-Registry) &mdash; the same loop, traced through the actual skill files and CLI
   commands
+
+## Mode 9 &mdash; `ad-research`
+
+Added 2026-08-26, alongside the research store. It works an open question from the queue, ingests notes
+brought in by hand, and derives durable learnings into `research/`. It is the mode that *fills* the
+library the other four read from.
+
+It exists because modes 7 and 8 had no write path at all: `ad-ideation` and `ad-intake` reasoned in a
+session and produced prose that died with it &mdash; the only two modes in the system with no
+persistence. Both now write too, but neither is the right home for "go and find out whether X is true,"
+which is its own job with its own discipline.
+
+The discipline that makes it worth having is the confidence gate: only `live-data`, `platform-doc` and
+`source-code` claims may be recorded as `high` confidence, and a `live-data` claim below
+`MIN_SAMPLE = 30` can only be `low`. A competitor observation or an informed hunch caps at `medium`
+however convincing it feels. See [The research loop](The-research-loop).
+
+A research pass starts with `ad-agent open` and ends with at least one `learn` or one `question`
+written down. A pass that raises more questions than it closes is not a failed pass &mdash; but a pass
+that writes nothing has not happened.

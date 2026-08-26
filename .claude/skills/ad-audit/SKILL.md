@@ -13,6 +13,13 @@ Pull performance data via:
 ad-agent fetch-analytics --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--network snap|meta|all] [--audience ...]
 ```
 
+**Known blind spot, until it is fixed:** the `--audience` filter cannot see ad sets whose names follow
+`rules/naming.md`. `pocket-dating-coach`'s `audienceOf()` infers audience from gender words in the
+campaign name and `utm_*` values, and a conforming ad set carries UUIDs and a gender-free campaign
+name — so `WOMEN_18-22_CASUAL_LPV` classifies as `unknown`. Read that ad set by ad-set id, never by
+audience filter, and treat any men-vs-women split as blind to it. See
+`lrn-2026-08-26-naming-conformance-breaks-audience-cut`.
+
 This calls `pocket-dating-coach`'s authenticated internal endpoint, which runs the exact same
 `buildAdAnalytics()` aggregation the admin dashboard itself uses — the same `MIN_SAMPLE = 30` gating,
 the same bot-traffic exclusion, the same ad-set-keyed leaderboard. **Never recompute a rate, tap rate,
@@ -35,6 +42,10 @@ reporting a guess as a verdict is the one mistake worth avoiding here above all 
 
 ## Procedure
 
+0. **`ad-agent open` first.** It lists every live record with its review date, which ones are past
+   their kill/double window, and — the one that changes how you read a number — which are funded below
+   `rules/budget.md`'s floor. An ad set running under the floor produces an `inconclusive`, not a weak
+   result, and knowing that before you look at its tap rate stops you writing the wrong verdict.
 1. **Pull the leaderboard** for the range in question. Note `paidButNoTraffic` flags, anomalies, and
    any campaign the endpoint already flags as a spend leak — these are instrumentation findings, not
    performance opinions, and should be surfaced regardless of what else you find.
@@ -50,8 +61,24 @@ reporting a guess as a verdict is the one mistake worth avoiding here above all 
 5. **Write the verdict back**:
    ```
    ad-agent log-review <rec_id> --verdict working|not-working|inconclusive \
-     --summary "..." --review-log /tmp/review.md
+     --summary "..." [--review-log /tmp/review.md] [--learning <lrn-id>]...
    ```
+   **This writes to three places, not one**, and you should read what it prints. Besides the record: it
+   appends the outcome to the creative's `prompts.md` with the audience and the effective daily spend
+   (`rules/creative-generation.md` §9 — a ranked prompt library is the reason the exact prompt text is
+   kept, and a prompt with no outcome attached taught nothing); and it walks `record → idea →
+   learnings` and marks every claim the recommendation rested on.
+
+   `working` supports those claims, `not-working` contradicts them, and **`inconclusive` records the
+   evidence without moving the belief** — which is the correct outcome when a campaign was unreadable
+   for reasons that say nothing about the claim, a spend cap below the floor being the obvious one.
+
+   If it prints `learnings: none`, the record is not linked to any belief and this verdict corrects
+   nothing in the library. That is worth a beat: either attach one with `--learning`, or notice that
+   the recommendation was never grounded in a recorded claim in the first place.
+
+   Only a record that actually ran can be reviewed, and only once. A later finding on a reviewed record
+   is `ad-agent note`, or `log-evidence` on the learning it bears on — not a second verdict.
 6. **Check `stats` for the bigger picture** once individual records are reviewed:
    ```
    ad-agent stats
@@ -59,6 +86,27 @@ reporting a guess as a verdict is the one mistake worth avoiding here above all 
    ```
    Look for patterns worth escalating to `ad-ideation` — a persona that consistently underperforms, a
    creative angle that consistently wins, a network where nothing has cleared `MIN_SAMPLE` yet.
+
+7. **File what you could not explain.** An `inconclusive` verdict, an anomaly with no cause, a number
+   that disagrees with another number — these are the raw material of the next research pass, and they
+   evaporate if they only appear in this session's output:
+   ```
+   ad-agent question --text "..." --kind tracking|audience|creative|channel|... \
+     --why "what decision it unblocks" --raised-by <rec_id>
+   ```
+   An unexplained result does not stay unexplained. It gets attached to whatever hypothesis is nearest
+   when the next weak read arrives — which has already happened here once, when a `conversion_page_views:
+   0` reading was confidently blamed for a stuck learning phase it had nothing to do with.
+
+8. **Record a durable finding as a learning, not just a verdict.** A verdict is about one ad set; a
+   learning is about the world and outlives the campaign that produced it:
+   ```
+   ad-agent learn --claim "..." --subject ... --source live-data --confidence high|medium|low \
+     --sample-n <n> --evidence "..."
+   ```
+   `--sample-n` is required for `live-data` and the claim can only be `low` below `MIN_SAMPLE = 30` —
+   the same floor this skill already applies to verdicts, enforced by the command rather than by you
+   remembering.
 
 ## Status checks ("how are the ads doing")
 

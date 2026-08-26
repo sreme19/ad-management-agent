@@ -21,7 +21,8 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
    API-calling reference implementation to build later — every mode here is a skill that does its
    reasoning live in whatever Claude Code session is running it, and persists results through this
    repo's zero-API CLI (`ad-agent ...`). The CLI never imports or calls an Anthropic client.
-2. **Four skills, manual-trigger-only for v1:**
+2. **Five skills, manual-trigger-only.** `ad-research` (mode 9) was added 2026-08-26 alongside the
+   research store — modes 7 and 8 had no write path at all until then, which is the hole it closes:
    - `ad-setup-loop` — mode 5: recommend campaign/ad-set/ad names, targeting, and creative; write the
      recommendation back to the ledger; later, once you've set it up by hand, log the real IDs.
    - `ad-audit` — mode 6: research what's live and deployed, infer what's working, write findings back
@@ -34,6 +35,9 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
      verdict gate. An approved idea feeds into `ad-setup-loop`.
    - `ad-intake` — mode 8: you paste or describe an ad you found elsewhere; the skill learns from it and
      can feed a resulting idea into `ad-setup-loop`. Direct analog of job-hunt's `linkedin-opportunity`.
+   - `ad-research` — mode 9: work an open question from the queue, ingest notes brought in by hand, and
+     derive durable learnings into `research/`. The mode that fills the library the other four read
+     from. See "Research" below for the precedence rule against `rules/`.
 3. **The boundary, as amended 2026-08-26.** Originally: this agent never calls a Meta or Snap Ads
    Manager API at all, and every `ad-setup-loop` output is instructions a human executes by hand.
    **The app owner lifted that on 2026-08-26**, explicitly and after the trade-off was put to them,
