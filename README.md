@@ -165,7 +165,7 @@ ad-agent note [-h] --text TEXT [--kind {budget,targeting,creative,incident,obser
 #### `log-review`
 
 ```
-ad-agent log-review [-h] --verdict {working,not-working,inconclusive} --summary SUMMARY [--review-log REVIEW_LOG] rec_id
+ad-agent log-review [-h] --verdict {working,not-working,inconclusive} --summary SUMMARY [--review-log REVIEW_LOG] [--learning LEARNING] rec_id
 ```
 
 #### `abandon`

@@ -161,10 +161,14 @@ class TestCreative:
         self, ledger_root, capsys
     ):
         # creative-generation.md sec 9: a prompt with no outcome attached taught nothing.
+        # log-review writes the outcome itself now, so this covers the case that is
+        # left: a record reviewed before that existed, or whose write did not land.
         run(propose_argv(ledger_root))
         rec = rec_id_of(ledger_root)
         go_live(ledger_root, rec)
         run(["log-review", rec, "--verdict", "not-working", "--summary", "no taps"])
+        prompts = ledger_root / "creatives" / "test-asset" / "prompts.md"
+        prompts.write_text(prompts.read_text().split("## Outcome")[0])
         capsys.readouterr()
         run(["open"])
         assert "never written back to the prompt library" in capsys.readouterr().out
@@ -174,8 +178,24 @@ class TestCreative:
         rec = rec_id_of(ledger_root)
         go_live(ledger_root, rec)
         run(["log-review", rec, "--verdict", "not-working", "--summary", "no taps"])
+        # log-review writes this itself now; the detector keys off the record's own
+        # id rather than a keyword, so another record's outcome will not satisfy it.
         prompts = ledger_root / "creatives" / "test-asset" / "prompts.md"
-        prompts.write_text(prompts.read_text() + "\n## Verdict: not-working\n")
+        assert rec in prompts.read_text()
         capsys.readouterr()
         run(["open"])
         assert "never written back" not in capsys.readouterr().out
+
+    def test_another_records_outcome_does_not_satisfy_the_check(self, ledger_root, capsys):
+        run(propose_argv(ledger_root))
+        rec = rec_id_of(ledger_root)
+        go_live(ledger_root, rec)
+        prompts = ledger_root / "creatives" / "test-asset" / "prompts.md"
+        prompts.write_text(prompts.read_text() + "\n## Outcome — rec-2020-01-01-other\n\n"
+                           "**working** — a different campaign entirely.\n")
+        run(["log-review", rec, "--verdict", "not-working", "--summary", "no taps"])
+        # Undo log-review's own write, leaving only the unrelated outcome behind.
+        prompts.write_text(prompts.read_text().split(f"## Outcome — {rec}")[0])
+        capsys.readouterr()
+        run(["open"])
+        assert "never written back" in capsys.readouterr().out

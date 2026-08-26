@@ -56,8 +56,19 @@ question ──→ research ──→ note ──→ learning ──→ idea ─
 
 `log-evidence` is the back-edge, and it is the part that matters most. Without it the library only
 ever grows and never corrects itself — and a store that confidently records wrong things is worse
-than no store at all. When a campaign returns a verdict, that verdict belongs on the learning that
-produced the recommendation, marking it `supported`, `contradicted`, or `mixed`.
+than no store at all.
+
+**You rarely run it by hand.** `ad-agent log-review` walks `record → idea → learnings` and applies the
+verdict to every claim the recommendation rested on: `working` supports, `not-working` contradicts,
+and `inconclusive` records the evidence without moving the belief. Run `log-evidence` yourself for a
+record with no idea behind it, or when a result bears on a claim the chain doesn't know about —
+`log-review --learning <id>` does the same thing inline.
+
+One caution, since the propagation is automatic: **an idea should cite only the learnings its test
+actually bears on.** Every one it lists receives the verdict, so a claim the campaign never varied
+will be marked on evidence it did not produce. Nothing is lost when that happens — evidence is
+append-only and names the record — but the fix is a narrower `--learning` list when the idea is
+written, not a correction afterwards.
 
 ## Staleness
 

@@ -119,6 +119,7 @@ def cmd_propose(args: argparse.Namespace, ledger: Ledger) -> None:
         budget_cap_inr_per_day=args.budget_cap,
         duration_days=args.duration_days,
         brief_path=args.brief,
+        from_idea=args.from_idea,
         today=_today(),
     )
     ledger.write_index()
@@ -493,16 +494,103 @@ def cmd_note(args: argparse.Namespace, ledger: Ledger) -> None:
     print(f"noted on {rec.rec_id} ({args.kind}) -> {rec.path}")
 
 
-def cmd_log_review(args: argparse.Namespace, ledger: Ledger) -> None:
-    rec = ledger.log_review(
-        args.rec_id,
-        verdict=args.verdict,
-        summary=args.summary,
-        review_log_path=args.review_log,
-        today=_today(),
+# A campaign verdict is evidence about a creative and evidence about a belief.
+# rules/creative-generation.md sec 9 requires the first; the research loop needs
+# the second. Both were written down as things someone should remember to do,
+# which is how they stop happening around run four.
+_VERDICT_TO_OUTCOME = {
+    "working": "supported",
+    "not-working": "contradicted",
+    # A campaign can be unreadable for reasons that say nothing about the claim —
+    # a campaign cap below the floor, broken tracking. That records the evidence
+    # without moving the belief, which is the honest handling.
+    "inconclusive": "inconclusive",
+}
+
+
+def _write_prompt_outcome(ledger: Ledger, rec, verdict: str, summary: str, today: str) -> str:
+    """Append the verdict to the creative's prompt pack.
+
+    rules/creative-generation.md sec 9: the reason the exact prompt text is kept is
+    that a ranked prompt library accumulates across campaigns — which prompt
+    patterns produce assets that earn taps, per persona. A prompt with no outcome
+    attached taught nothing, so the audience goes in the entry too.
+    """
+    fm = rec.front_matter
+    ref = str(fm.get("creative_ref") or "").strip("/")
+    if not ref:
+        return "no creative_ref on the record — prompt library not updated"
+    prompts = ledger.root / ref / "prompts.md"
+    if not prompts.exists():
+        return f"{ref}/prompts.md does not exist — prompt library not updated"
+
+    spec = fm.get("targeting")
+    audience = targetingspec.describe(spec) if spec else str(fm.get("targeting_summary") or "")[:80]
+    budget = fm.get("budget_cap_inr_per_day")
+    cap = fm.get("campaign_daily_cap_inr")
+    effective = min(budget, cap) if (budget is not None and cap is not None) else budget
+    spend = f"Rs {float(effective):.0f}/day x {fm.get('duration_days')}d" if effective else "n/a"
+
+    prompts.write_text(
+        prompts.read_text(encoding="utf-8").rstrip()
+        + f"\n\n## Outcome — {fm['rec_id']} ({today})\n\n"
+        f"**{verdict}** — {summary.strip()}\n\n"
+        f"- Ad set: `{fm.get('ad_set_name')}`\n"
+        f"- Audience: {audience}\n"
+        f"- Spend: {spend}\n",
+        encoding="utf-8",
     )
+    return f"{ref}/prompts.md"
+
+
+def cmd_log_review(args: argparse.Namespace, ledger: Ledger) -> None:
+    today = _today()
+    try:
+        rec = ledger.log_review(
+            args.rec_id,
+            verdict=args.verdict,
+            summary=args.summary,
+            review_log_path=args.review_log,
+            today=today,
+        )
+    except ValueError as exc:
+        _fail(exc)
     ledger.write_index()
     print(f"logged review for {rec.rec_id} -> verdict={args.verdict}")
+
+    # --- back-edge 1: the prompt library ---
+    print(f"  creative:  {_write_prompt_outcome(ledger, rec, args.verdict, args.summary, today)}")
+
+    # --- back-edge 2: the beliefs this recommendation rested on ---
+    r = _research(ledger)
+    refs = list(args.learning or [])
+    idea_id = rec.front_matter.get("from_idea")
+    idea = r.idea_for_rec(rec.rec_id) if not idea_id else None
+    if idea is not None:
+        idea_id = idea.front_matter["id"]
+    if idea_id:
+        try:
+            refs += [x for x in (r.find(idea_id).front_matter.get("learnings") or [])
+                     if x not in refs]
+        except KeyError:
+            print(f"  warning:   {idea_id} is on the record but not in ideas/")
+
+    if not refs:
+        # Said out loud rather than passed over in silence: a verdict that updates
+        # no belief means nothing in the library gets corrected by this result.
+        print("  learnings: none — this record is not linked to any. Attach one with "
+              f"`log-evidence <id> --from {rec.rec_id}` if it bears on a claim.")
+        return
+
+    outcome = _VERDICT_TO_OUTCOME[args.verdict]
+    for ref in refs:
+        try:
+            updated = r.log_evidence(ref, outcome=outcome, text=args.summary,
+                                     from_ref=rec.rec_id, today=today)
+        except (researchmod.ResearchError, KeyError) as exc:
+            print(f"  warning:   {ref} not updated: {exc}", file=sys.stderr)
+        else:
+            print(f"  learning:  {ref} -> {outcome} (now {updated.front_matter['status']})")
 
 
 def cmd_abandon(args: argparse.Namespace, ledger: Ledger) -> None:
@@ -776,8 +864,12 @@ def cmd_open(args: argparse.Namespace, ledger: Ledger) -> None:
         ref = str(r.front_matter.get("creative_ref") or "").strip("/")
         prompts = root / ref / "prompts.md"
         if ref and prompts.exists():
-            text = prompts.read_text(encoding="utf-8").lower()
-            if "verdict" not in text:
+            # Look for this record's own id, not for the word "verdict". A prompt
+            # pack is shared across campaigns, so the question is whether *this*
+            # result is recorded against it — and a keyword scan would be satisfied
+            # by some other record's outcome, or by the word appearing in a QA note.
+            text = prompts.read_text(encoding="utf-8")
+            if r.front_matter["rec_id"] not in text:
                 no_backedge.append(
                     f"{r.rec_id}  {ref}/prompts.md carries no verdict  "
                     f"-> creative-generation.md sec 9: a prompt with no outcome taught nothing")
@@ -1100,6 +1192,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--verdict", required=True, choices=["working", "not-working", "inconclusive"])
     sp.add_argument("--summary", required=True)
     sp.add_argument("--review-log", default=None, help="path to a markdown review-detail file")
+    sp.add_argument("--learning", action="append", default=None,
+                    help="learning id this verdict bears on, beyond any reached via the record's "
+                         "idea; repeatable")
     sp.set_defaults(func=cmd_log_review)
 
     sp = sub.add_parser("abandon", help="Close out a recommendation that was never executed")

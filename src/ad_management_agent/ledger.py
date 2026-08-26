@@ -94,6 +94,7 @@ class Ledger:
         duration_days: int,
         brief_path: str,
         today: str,
+        from_idea: str | None = None,
     ) -> Record:
         base_slug = slugify(slug)
         slug = base_slug
@@ -124,6 +125,8 @@ class Ledger:
             "destination_url": destination_url,
             "budget_cap_inr_per_day": budget_cap_inr_per_day,
             "duration_days": duration_days,
+            # rec -> idea -> learnings is the chain `log-review`'s back-edge walks.
+            "from_idea": from_idea,
             "created": today,
         }
         brief = Path(brief_path).read_text(encoding="utf-8") if brief_path else ""
@@ -304,6 +307,15 @@ class Ledger:
         if verdict not in VERDICTS:
             raise ValueError(f"verdict must be one of {VERDICTS}, got {verdict!r}")
         rec = self.find(rec_id)
+        status = rec.front_matter.get("status")
+        if status not in ("live", "executing"):
+            raise ValueError(
+                f"{rec_id} is {status!r}; a verdict belongs on something that actually ran.\n"
+                + ("It has already been reviewed — a later finding is a `note`, or evidence on "
+                   "the learning it bears on, not a second verdict."
+                   if status == "reviewed" else
+                   "Record the real ids with `log-setup` first, or `abandon` it if it never ran.")
+            )
         rec.front_matter.update({"status": "reviewed", "verdict": verdict, "reviewed": today})
         detail = Path(review_log_path).read_text(encoding="utf-8") if review_log_path else ""
         rec.body += (

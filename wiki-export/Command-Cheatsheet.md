@@ -88,7 +88,7 @@ ad-agent note [-h] --text TEXT [--kind {budget,targeting,creative,incident,obser
 #### `log-review`
 
 ```
-ad-agent log-review [-h] --verdict {working,not-working,inconclusive} --summary SUMMARY [--review-log REVIEW_LOG] rec_id
+ad-agent log-review [-h] --verdict {working,not-working,inconclusive} --summary SUMMARY [--review-log REVIEW_LOG] [--learning LEARNING] rec_id
 ```
 
 #### `abandon`
@@ -414,9 +414,40 @@ Closes out a proposal that was never executed. Without this, it sits as `propose
 
 ```
 ad-agent log-review <rec_id> --verdict working|not-working|inconclusive \
-  --summary "..." [--review-log /tmp/review.md]
+  --summary "..." [--review-log /tmp/review.md] [--learning <id>]...
 ```
 Status → `reviewed`. `--review-log` is optional and holds the longer written detail behind the verdict.
+
+**Only a record that actually ran can be reviewed.** A `proposed` record has no outcome to judge, and a
+`reviewed` one already has its verdict — a later finding is a `note`, or evidence on the learning it
+bears on, not a second verdict.
+
+### This command writes to three places, not one
+
+A campaign verdict is evidence about a creative *and* evidence about a belief. Both used to be written
+down as things someone should remember to do, which is how they stop happening around run four.
+
+1. **The record** — status, verdict, summary, as before.
+2. **`creatives/<slug>/prompts.md`** — an `## Outcome` section carrying the verdict, the ad-set name,
+   the audience, and the **effective** daily spend (the campaign cap if one binds, not the proposed
+   figure — otherwise a starved test reads as a weak creative). This is
+   `rules/creative-generation.md` §9: the reason the exact prompt text is kept is that a ranked prompt
+   library accumulates across campaigns, and a prompt with no outcome attached taught nothing.
+3. **Every learning the recommendation rested on**, reached along `record → idea → learnings`.
+   `working` marks them supported, `not-working` contradicted, and **`inconclusive` records the
+   evidence without moving the belief** — a campaign can be unreadable for reasons that say nothing
+   about the claim, a campaign cap below the floor being the obvious one.
+
+Each is reported on its own line. If the record is linked to no learning at all, it says so rather
+than passing over it in silence — a verdict that corrects nothing in the library is worth noticing.
+
+**Cite on the idea only what the test actually bears on.** Every learning an idea lists gets the
+verdict, so an idea that names a claim the campaign never varied will have that claim marked on
+evidence it did not produce. Nothing is lost when this happens — the entry is append-only and names
+the record — but the fix is a narrower `--learning` list at `idea` time, not a correction afterwards.
+
+For a record with no idea behind it, `--learning <id>` attaches one by hand. That is additive, not an
+escape hatch: there is no flag that turns the propagation off.
 
 ## "How's the ledger looking overall?"
 

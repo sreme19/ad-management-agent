@@ -252,7 +252,20 @@ proposed → executing → live → reviewed
   `log-review` is the end. Without this, a budget raised on day three leaves no trace and the verdict
   gets judged against conditions that quietly moved. Notes never rewrite anything.
 - `ad-agent log-review <rec_id> --verdict working|not-working|inconclusive ...` — mode 6's write-back.
-  Status → `reviewed`.
+  Status → `reviewed`. **Only a `live` (or `executing`) record may be reviewed**; a proposal has no
+  outcome to judge and a reviewed record already has its verdict.
+
+  **This is the loop's closing edge, and it writes to three places.** Besides the record: the
+  creative's `prompts.md` gets an `## Outcome` section with the audience and the *effective* daily
+  spend (`rules/creative-generation.md` §9 — a prompt with no outcome attached taught nothing, and a
+  ranked prompt library is the point of keeping the exact text); and every learning the
+  recommendation rested on, reached along `record → idea → learnings`, gets dated evidence via
+  `log_evidence`. `inconclusive` records the evidence without moving the belief, because a campaign
+  can be unreadable for reasons that say nothing about the claim.
+
+  Both were previously mandated in prose and enforced nowhere. A mandated manual step with no
+  enforcement is a step that stops happening around run four, which is why this is a code path rather
+  than a line in a skill file. There is no flag to turn it off; `--learning` only adds.
 - `ad-agent abandon <rec_id> --reason ...` — for a proposal you decided not to execute. Without this,
   unexecuted proposals sit as `proposed` forever and pollute `stats`.
 

@@ -441,6 +441,18 @@ class Research:
         rec.save()
         return rec
 
+    def idea_for_rec(self, rec_id: str) -> Record | None:
+        """The idea a record came from, if any.
+
+        The chain the back-edge walks is rec -> idea -> learnings. Records carry
+        `from_idea` since 2026-08-26, but the idea has always carried `rec_id`, so
+        searching from this end also works for anything written before that.
+        """
+        for idea in self.ideas():
+            if idea.front_matter.get("rec_id") == rec_id:
+                return idea
+        return None
+
     def mark_idea_proposed(self, idea_id: str, *, rec_id: str, today: str) -> Record:
         rec = self.find(idea_id)
         if not idea_id.startswith("idea-"):
