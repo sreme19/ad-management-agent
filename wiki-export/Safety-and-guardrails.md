@@ -3,46 +3,75 @@
 A few decisions in this system look like they add friction on purpose. They do, deliberately, and this
 page explains why each one earns its keep.
 
-## Ads Manager is never touched directly
+## Nothing this agent creates can spend money
+
+> **Amended 2026-08-26.** This page previously said the agent never calls a Meta or Snap Ads Manager
+> API at all, and holds no credential that could. **That is no longer true for Snap**, and the change
+> was the app owner's explicit call after the trade-off was put to them. The section below describes
+> what actually stands now. Meta is unchanged.
 
 ```mermaid
 flowchart LR
     subgraph Inside["What the system does itself"]
         Research["Researches competitors\nand real performance data"]
         Draft["Writes a recommendation:\nnames, targeting, creative, budget"]
+        Push["Creates it on Snap — PAUSED —\nthen reads it back and diffs it"]
     end
 
     subgraph Outside["What only a human does"]
-        Setup(["Creates the campaign/ad set/ad\nin Ads Manager, by hand"])
-        Change(["Enables it, changes its budget"])
+        Enable(["Enables it: starts the spend"])
+        Change(["Changes the budget of anything live"])
+        Meta(["Anything at all on Meta"])
     end
 
     Inside -.->|"the system never\ncrosses this line"| Outside
 ```
 
-This is the single non-negotiable rule in `SPEC.md`, and it's stricter than the equivalent rule in
-`job-hunt-agent` (which never automates sending a LinkedIn message, mainly to protect one person's
-account from a platform ban). Here, money and audience reach are directly on the line &mdash; a wrong
-automated action doesn't just risk an account, it spends real budget against a real audience with no
-human in the loop at the moment it happens. So the boundary is drawn wider: this agent doesn't just
-avoid *sending*, it never calls a Meta or Snap Ads Manager API **at all**, for anything &mdash; not to
-create, not to publish, not to enable, not to change a budget. It doesn't even hold a credential that
-*could* do any of those things (see "No credential that could reach a live account," below). Every
-`ad-setup-loop` output is a checklist a person executes by hand.
+The boundary moved, but it did not blur. What stands:
 
-This holds even for a future Claude plugin the system's author has described, one that would "steer"
-implementation of a recommendation directly inside Ads Manager. That plugin's job, if it's ever built,
-is telling the human exactly what to click, field by field &mdash; never clicking it.
+- **Snap: creation yes, enabling never.** `ad-agent snap-push` creates campaigns, ad squads, creatives
+  and ads &mdash; **always with status `PAUSED`** &mdash; and reads every object back from the API to
+  diff it against the plan before it exits, because a 200 from a POST is not evidence that an ad squad
+  targets who you think it targets. Starting spend is a human action in Ads Manager, every time.
+- **Meta: unchanged, entirely hands-off.** No Ads Manager call, no Marketing API credential. Research
+  (`ad-ideation`, `ad-intake`) works from public sources &mdash; the Meta Ads Library, Snap's public ad
+  search, Google's Ads Transparency Center &mdash; and from `pocket-dating-coach`'s own exports.
+- **Never change the budget of anything already live**, on either network.
 
-## No credential that could reach a live account, at all
+Why the line sits exactly there: money and audience reach are what is on the table, and the moment that
+matters is not creation but *enablement*. A paused object spends nothing, can be inspected in the UI,
+and can be deleted. So the agent is allowed to do the tedious, error-prone part &mdash; forty fields
+typed correctly, every UTM parameter literal rather than a macro that can silently fail &mdash; and is
+not allowed to do the part where money starts moving.
 
-It would be possible to *say* "never call the Ads Manager API" as a policy and still hold a Meta/Snap
-Marketing API credential that technically could. This system doesn't: it holds no Meta or Snap Marketing
-API credential of any kind. Research (`ad-ideation`, `ad-intake`) works from public sources &mdash; the
-Meta Ads Library, Snap's public ad search, Google's Ads Transparency Center &mdash; and from
-`pocket-dating-coach`'s own exports, never a direct, credentialed connection to either ad platform. That
-makes the "never touches Ads Manager" rule structurally true rather than merely a policy someone has to
-keep honoring.
+This holds for the future Claude plugin the system's author has described, one that would "steer"
+implementation directly inside Ads Manager. That plugin's job, if it is ever built, is telling the human
+exactly what to click, field by field &mdash; never clicking the thing that starts spend.
+
+## What was lost, and what replaced it
+
+Be straightforward about the cost. The old rule was enforced by construction: the repo held no
+credential that could reach a live account, so "never touches Ads Manager" was not a policy anyone had
+to keep honoring &mdash; it was a fact about what was possible. `config.local.yaml` now holds a Snap
+OAuth client id, secret and refresh token. That guarantee is gone, and no amount of careful wording
+brings it back.
+
+What replaced it is weaker, and worth stating precisely so nobody mistakes it for the original:
+
+1. **A transport-layer refusal.** Every outbound request passes through one function,
+   `SnapClient._call`, which inspects the payload at every nesting depth &mdash; Snap wraps each object
+   in a list under a plural key, so a dangerous field is never at the top level &mdash; and refuses any
+   enabling status value, or any budget field on a `PUT`. Creation carrying a budget is allowed;
+   changing one on an object that already exists is not. There is no override flag.
+2. **At the choke point, not at each call site.** This is the whole design: a method added six months
+   from now cannot skip a check it never knew about.
+3. **Tested as an invariant.** `tests/test_snap_safety.py` asserts every enabling spelling is refused,
+   that the real create paths still pass, and that a refused request never reaches the network.
+4. **Paused-only creation, plus a mandatory read-back diff**, as above.
+5. **Access tokens minted per run** from the refresh token, never written to disk.
+
+That is a guarantee held up by code and tests rather than by the absence of a key. It is the honest
+description, and the reason this section exists rather than a line saying the rule is unchanged.
 
 ## The database and API access are both scoped as narrowly as the job allows
 

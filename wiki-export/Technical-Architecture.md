@@ -12,7 +12,7 @@ instead &mdash; this page assumes you're comfortable with terms like "CLI" and "
 | LLM | None, in this repo | Every mode is a Claude Code skill; the CLI never imports or calls an Anthropic client (`SPEC.md` decision #1) |
 | Ledger storage | Markdown files with YAML front matter, one per campaign, via **PyYAML** | Chosen over a spreadsheet (no pre-existing habit to extend, unlike job-hunt's Career Hacking Tracker) and over plain JSON (a human has to read this too) — see [The ledger](The-ledger) |
 | CLI framework | Python's built-in **argparse**, one subparser per command | Small, dependency-free surface — `propose`, `log-setup`, `log-review`, `abandon`, `stats`, `dump-ledger`, `fetch-analytics` |
-| External data | One plain HTTP call (`urllib`) to `pocket-dating-coach`'s internal endpoint | No SDK, no scraping, no credentialed connection to Meta or Snap at all (`SPEC.md` decision #10) |
+| External data | One plain HTTP call (`urllib`) to `pocket-dating-coach`'s internal endpoint, plus `urllib` against Snap's Marketing API | No SDK and no scraping. Snap credentials since 2026-08-26, for paused-only creation; **no Meta credential** (`SPEC.md` decision #10, amended for Snap only) |
 | Packaging | `pyproject.toml`, installed with `pip install -e .` | Ships an `ad-agent` console-script entry point |
 | Config | A gitignored `config.local.yaml`, loaded with PyYAML | Real endpoint URL, API key, and DB connection string live here, never in code |
 
@@ -102,7 +102,11 @@ with a clear stderr message and a non-zero status rather than guessing at a resu
 - **No server, no daemon, no cron in this repo.** Every mode is triggered by asking for it in a Claude
   Code session. `ad-audit` is the one candidate for a future scheduled task (`SPEC.md` decision #2), and
   only once it's been trusted from repeated manual runs — not attempted yet.
-- **No Meta/Snap Marketing API client, and no credential for one anywhere in config or code** — see
+- **No Meta Marketing API client, and no Meta credential anywhere in config or code.** Snap is the
+  exception, and only since 2026-08-26: `snap.py` is a ~240-line `urllib` client with no SDK, holding
+  credentials in gitignored `config.local.yaml`, minting access tokens per run and never writing them
+  to disk. It can create — always `PAUSED` — and it cannot enable anything or change a live budget,
+  refused at the transport layer rather than by convention. See
   [Safety-and-guardrails](Safety-and-guardrails).
 - **No dependency on `pocket-dating-coach`'s TypeScript.** The only coupling is an HTTP call to one JSON
   endpoint.

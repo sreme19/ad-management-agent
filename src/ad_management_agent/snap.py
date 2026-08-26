@@ -9,7 +9,10 @@ own discipline, and it is deliberately narrow:
   * Everything is created PAUSED. Nothing here can start spending money.
   * There is no enable/resume call anywhere in this file, and none should be added
     without the app owner saying so explicitly. Enabling stays a human action in
-    Ads Manager.
+    Ads Manager. This is enforced rather than promised: `_call` refuses any outbound
+    payload carrying an enabling status, or a budget field on a PUT, at the single
+    choke point every request passes through — so a method added later cannot skip a
+    check it never knew about.
   * Every object is read back from the API after creation and diffed against what
     was asked for, because "the POST returned 200" is not evidence the ad squad
     targets who you think it targets.
@@ -33,6 +36,49 @@ MICRO = 1_000_000
 
 class SnapError(RuntimeError):
     pass
+
+
+class SnapSafetyError(SnapError):
+    """An outbound request would have broken the paused-only rule. Never catch this."""
+
+
+# Snap's own enabling values, plus the near-synonyms a future method might reach for.
+# PAUSED is deliberately absent: pausing stops spend, and stopping spend is always safe.
+ENABLING_STATUSES = {"ACTIVE", "RUNNING", "ENABLED", "ON", "LIVE"}
+
+# Changing any of these on an object that already exists is a budget change, which
+# decision #3 forbids outright. Setting them at creation time is how an ad squad gets
+# a budget at all, so the check is scoped to PUT rather than to the key alone.
+BUDGET_KEYS = {
+    "daily_budget_micro",
+    "lifetime_budget_micro",
+    "lifetime_spend_cap_micro",
+    "daily_spend_cap_micro",
+    "spend_cap_micro",
+    "bid_micro",
+}
+
+
+def _safety_violations(method: str, payload: object, path: str = "") -> list[str]:
+    """Every reason this outbound payload must not be sent. Empty means safe.
+
+    Walks the whole structure rather than checking the top level, because Snap wraps
+    every object in a list under a plural key — `{"adsquads": [{"status": "ACTIVE"}]}`
+    hides the field two levels down.
+    """
+    found: list[str] = []
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            here = f"{path}.{key}" if path else key
+            if key == "status" and isinstance(value, str) and value.upper() in ENABLING_STATUSES:
+                found.append(f"{here} = {value!r} would enable an object")
+            if key in BUDGET_KEYS and method.upper() in ("PUT", "PATCH"):
+                found.append(f"{here} on a {method.upper()} would change an existing budget")
+            found += _safety_violations(method, value, here)
+    elif isinstance(payload, list):
+        for i, item in enumerate(payload):
+            found += _safety_violations(method, item, f"{path}[{i}]")
+    return found
 
 
 class SnapClient:
@@ -72,6 +118,25 @@ class SnapClient:
         return self._token
 
     def _call(self, method: str, path: str, payload: dict | None = None) -> dict:
+        # The paused-only rule, enforced at the one place every request passes through.
+        #
+        # SPEC.md decision #3 (as amended 2026-08-26) states that this module never
+        # enables anything and never changes the budget of anything live, and notes
+        # honestly that the guarantee is no longer structural — the repo now holds a
+        # credential that can reach a live account, so "never" rests on the code being
+        # careful. Prose in a docstring is not carefulness that survives the next
+        # method someone adds. This is: a new call cannot forget a check it never had
+        # to remember. There is no override flag, and there is not meant to be one.
+        if payload is not None:
+            violations = _safety_violations(method, payload)
+            if violations:
+                raise SnapSafetyError(
+                    f"REFUSED: {method} {path} would break the paused-only rule.\n"
+                    + "\n".join(f"  - {v}" for v in violations)
+                    + "\n\nSee SPEC.md decision #3. Enabling an ad set and raising the budget of a\n"
+                    "live one are human actions in Ads Manager, deliberately. If this refusal is\n"
+                    "wrong, the fix is the app owner amending that decision — not this check."
+                )
         data = json.dumps(payload).encode() if payload is not None else None
         req = urllib.request.Request(
             f"{API}{path}", data=data, method=method,

@@ -56,11 +56,20 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
      the deviation and prints the `note` command to record it, and never proceeds quietly. The observed
      caps are written onto the record, so `open` can tell a funded ad set from a starved one.
 
+   - The paused-only rule is **enforced at the transport layer, not asserted in a comment.**
+     `SnapClient._call` inspects every outbound payload — at every nesting depth, because Snap wraps
+     each object in a list under a plural key — and raises `SnapSafetyError` on any enabling status
+     value, or on any budget field in a `PUT`. Creation carrying a budget stays allowed; changing one
+     on an object that already exists does not. There is no override flag.
+
    **Be clear about what was lost.** The old rule was enforced by decision #10 — the agent held no
    credential that could reach a live account, so "never touches a live account" was true by
    construction. That is now true only because this code is careful. It is a weaker kind of guarantee,
-   and the paused-only rule above is what carries the weight instead. Meta is unchanged and remains
-   fully hands-off; this amendment covers Snap only.
+   and the paused-only rule above is what carries the weight instead. Putting the check at the single
+   choke point every request passes through is what "careful" has to mean to be worth anything: a
+   method added later cannot skip a check it never knew about, and `tests/test_snap_safety.py` asserts
+   a refused request never reaches the network. Meta is unchanged and remains fully hands-off; this
+   amendment covers Snap only.
 4. **The close-the-loop step is mandatory, not optional.** A `propose`d recommendation with no
    `log-setup` sits as an open loose end forever; `ad-audit` cannot join a recommendation to a real
    outcome without the real `ad_set_id` on record. See "Ledger" below for the exact lifecycle.
@@ -270,6 +279,10 @@ tying an asset to the `rec_id`/`ad_id` that used it.
 - The `ads_agent_ro` read-only Postgres role (decision #7, channel 2) — not created yet.
 - A CSV/xlsx export of the ledger for ad hoc spreadsheet use — deferred until `dump-ledger`'s plain-text
   table proves insufficient.
+- CI. `pytest tests/` and `ruff check .` both run locally (`src/` and `tests/` carry six pre-existing
+  style findings between them, in line with the rest of the portfolio), but nothing runs them
+  automatically. `ad-agent commands --check` is the piece most worth wiring first, since documentation
+  drift is the failure that has actually happened here.
 - A Claude Code scheduled task for `ad-audit` — deferred until it's been run by hand enough times to
   trust unattended (decision #2).
 - The eventual Claude Code plugin that "steers implementation" of `ad-setup-loop`'s output directly in

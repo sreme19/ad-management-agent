@@ -46,7 +46,7 @@ flowchart TB
     CLI -.->|"fetch-analytics only"| PDC
 
     LedgerMod -.->|"rec_id, verdicts,\nstats surfaced back"| Human
-    Human -->|"sets up / changes anything\nin Ads Manager, by hand"| Boundary{{"never crossed by any code path:\nMeta/Snap Ads Manager API calls,\nMeta/Snap Marketing API credentials,\nmember-data tables"}}
+    Human -->|"enables it, changes a live budget,\nor does anything at all on Meta"| Boundary{{"never crossed by any code path:\nenabling anything, changing a live budget,\nany Meta API call or credential,\nmember-data tables"}}
     Human -->|"reports the real IDs,\nafter setting up by hand"| CLI
 ```
 

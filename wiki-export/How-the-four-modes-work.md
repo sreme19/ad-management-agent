@@ -37,15 +37,21 @@ and duration that are never left out. Before anything is handed off, the finishe
 checked explicitly against `rules/compliance.md`, rule by rule &mdash; not just "this feels fine."
 
 The output is a checklist a person can follow without re-deriving anything: exactly what to name each
-level in Ads Manager and what to paste into targeting and budget fields. **The skill never touches Ads
-Manager itself.**
+level in Ads Manager and what to paste into targeting and budget fields. On Snap, `ad-agent snap-push`
+can now execute that checklist for you &mdash; creating everything `PAUSED` and diffing it back against
+the plan. On Meta the skill still never touches Ads Manager itself.
 
 ## The one non-negotiable step
 
-Every recommendation, no matter which mode produced the idea behind it, stops at the same place: a
-person reads it, sets it up by hand, and reports back the real campaign/ad-set/ad IDs. Nothing in this
-system can create, publish, enable, or change budget on anything live. See
-[Why it's built this way](Safety-and-guardrails) for the reasoning.
+Every recommendation stops at the same place, whichever mode produced the idea behind it: **a person
+enables it.** Nothing in this system can enable anything, or change the budget of anything already
+live, on either network &mdash; refused at the transport layer, not by convention. Creation is
+permitted on Snap only, and only paused.
+
+The loop is not closed until the real campaign/ad-set/ad IDs are on the record, either from
+`snap-push`'s output or from `log-setup` after a hand-built setup. Without them `ad-audit` has nothing
+to join a real outcome back to. See [Why it's built this way](Safety-and-guardrails) for the reasoning
+and for what the 2026-08-26 amendment cost.
 
 ## Mode 6 &mdash; `ad-audit`: checking what's actually happening
 

@@ -178,6 +178,30 @@ pip install -e .
 On a machine whose system Python predates 3.10 (this project's floor), skip `pip` and let `uv` manage
 the environment — `uv run ad-agent <command>` works with no install step at all.
 
+## Tests
+
+```
+pip install -e ".[dev]" && pytest tests/ -q     # or: uv run --extra dev pytest tests/ -q
+ruff check .                                    # or: uv run --extra dev ruff check .
+```
+
+The suite covers the promises this repo makes in prose, on the principle that a rule stated only in a
+docstring is not a rule:
+
+- **The paused-only invariant** (`test_snap_safety.py`) — every enabling spelling is refused, at every
+  nesting depth Snap's list-wrapper format can hide one; budget fields are refused on a `PUT` but
+  allowed on creation; the real create/rewrite calls still pass; and a refused request never reaches
+  the network.
+- **The destination gate** — an audience/page mismatch, an unregistered page, a page that can't take
+  paid traffic, a name with no gender token, and that `amend` cannot launder any of them.
+- **Structured targeting** — the 18+ floor, the ad-set-name agreement check, patch-not-replace on
+  `amend`, and that the Snap read-back diff is derived from the record rather than a literal.
+- **The campaign-cap gate** — all six branches, including the exact 2026-08-26 case.
+- **The UTM scheme** — all five parameters, `utm_id` carrying the ad id, and no unresolved macro.
+- **`open`** — every loose-end category, and that a quiet report still names what it cannot see.
+- **The docs** — `commands --check` runs against the real README and cheatsheet, so the day this
+  repo grows a command without documenting it, the suite fails.
+
 `fetch-analytics` is wired up but non-functional until a small `pocket-dating-coach` PR (adding
 `/api/internal/ad-analytics`, authenticated via `ADS_AGENT_API_KEY`) ships — see `SPEC.md`, "Open /
 deferred."
