@@ -287,10 +287,12 @@ Four properties are load-bearing:
 
 - **Notes are immutable.** The content *is* the provenance; a claim pointing back at a note that could
   have been rewritten proves nothing.
-- **Confidence is gated, not self-declared.** Only `live-data` and `platform-doc` may be `high`;
-  everything else caps at `medium`. A `live-data` claim must state its sample size and can only be
-  `low` below `MIN_SAMPLE = 30` — decision #6, applied so a brief cannot lean on a number the
-  dashboard itself would call inconclusive.
+- **Confidence is gated, not self-declared.** Only `live-data`, `platform-doc` and `source-code` may
+  be `high`; everything else caps at `medium`. A `live-data` claim must state its sample size and can
+  only be `low` below `MIN_SAMPLE = 30` — decision #6, applied so a brief cannot lean on a number the
+  dashboard itself would call inconclusive. `ad-agent reclassify` corrects a mis-filing and runs the
+  same gate, so it is not a way around the ceiling; it cannot change the claim text, because evidence
+  already attached was gathered against the claim as written.
 - **The back-edge is a command, not a habit.** `log-evidence` puts a campaign's verdict onto the
   learning that spawned the recommendation. Disagreeing outcomes produce `mixed`, not whichever
   arrived last.

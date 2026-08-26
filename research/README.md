@@ -38,9 +38,16 @@ pointing back at it would prove nothing.
 
 ## Confidence is gated, not self-declared
 
-`--confidence high` is refused unless the source is `live-data` or `platform-doc`. Everything else —
-your own reading, a competitor observation, an informed hunch — caps at `medium`, however plausible.
-A test earns the upgrade.
+`--confidence high` is refused unless the source is `live-data`, `platform-doc`, or `source-code`.
+Everything else — your own reading, a competitor observation, an informed hunch — caps at `medium`,
+however plausible. A test earns the upgrade.
+
+`source-code` is for a fact read directly out of a codebase, ours or `pocket-dating-coach`'s. It was
+added the day the audience-classification break forced a statement about what `audienceOf()` *does* —
+verifiable by reading the function — to be filed alongside hunches as `own-research`/`medium`. Reading
+code is as certain as reading a doc. What it is **not** is durable: it describes something someone is
+actively changing, and one commit can invalidate it, so it carries high confidence on a 60-day clock.
+That pairing is deliberate, not a contradiction.
 
 A `live-data` claim must state `--sample-n`, and below `MIN_SAMPLE = 30` it can only be `low`. That
 is SPEC.md decision #6, inherited from `pocket-dating-coach`'s own `ad-analytics.ts`, applied here so
@@ -72,10 +79,21 @@ written, not a correction afterwards.
 
 ## Staleness
 
-Claims rot at different speeds, so each carries a `review_after` date set from its source:
-competitor observations 60 days, hunches 90, own research and live data 120, platform docs 180.
+Claims rot at different speeds, so each carries a `review_after` date set from its source: source-code
+and competitor observations 60 days, hunches 90, own research and live data 120, platform docs 180.
 `ad-agent open` lists what is past due. A claim nobody has reconfirmed is not automatically wrong —
 it is unverified, which is a different thing, and the report says so.
+
+## Fixing a mis-filed claim
+
+`ad-agent reclassify <id> --reason "..."` corrects a learning's `subject`, `source`, `confidence` or
+`sample_n`. It runs the same confidence gate `learn` does — so it cannot be used to get around the
+ceiling — appends a dated `## Reclassified` section recording what moved, and recomputes the review
+clock from `last_confirmed` rather than today, because re-filing something is not reconfirming it.
+
+**The claim text itself is deliberately not changeable.** Evidence already attached was gathered
+against the claim as written, and letting the wording move underneath it would make the whole trail
+lie. A claim that turned out to be the wrong claim is `retire` plus a new atom, not an edit.
 
 ## Reading it
 

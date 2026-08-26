@@ -109,6 +109,83 @@ class TestConfidenceIsGatedNotSelfDeclared:
         assert researchmod.MIN_SAMPLE == 30
 
 
+class TestSourceCode:
+    """Added 2026-08-26: reading a function is as certain as reading a doc."""
+
+    def test_a_code_claim_can_be_high_confidence(self, ledger_root):
+        assert run(learn(source="source-code", confidence="high", sample_n=None)) == 0
+
+    def test_it_goes_stale_faster_than_a_platform_doc(self, ledger_root):
+        # Certain when read, but it describes something someone is actively changing.
+        run(learn("code", source="source-code", confidence="high", sample_n=None))
+        run(learn("doc", source="platform-doc", confidence="high", sample_n=None))
+        code = fm_of(ledger_root, "lrn", f"lrn-{today()}-code")
+        doc = fm_of(ledger_root, "lrn", f"lrn-{today()}-doc")
+        assert code["review_after"] < doc["review_after"]
+
+    def test_it_needs_no_sample_size(self, ledger_root):
+        assert run(learn(source="source-code", confidence="high", sample_n=None)) == 0
+
+
+class TestReclassify:
+    """Correcting how a claim is filed, without touching what it claims."""
+
+    def test_it_moves_source_and_confidence_together(self, ledger_root):
+        run(learn(source="own-research", confidence="medium", sample_n=None))
+        lrn = f"lrn-{today()}-claim-a"
+        assert run(["reclassify", lrn, "--reason", "no source-code kind existed then",
+                    "--source", "source-code", "--confidence", "high"]) == 0
+        fm = fm_of(ledger_root, "lrn", lrn)
+        assert fm["source"] == "source-code" and fm["confidence"] == "high"
+
+    def test_the_correction_is_recorded_in_the_body(self, ledger_root):
+        run(learn(source="own-research", confidence="medium", sample_n=None))
+        lrn = f"lrn-{today()}-claim-a"
+        run(["reclassify", lrn, "--reason", "wrongly filed", "--source", "source-code"])
+        body = (ledger_root / "research" / "learnings" / f"{lrn}.md").read_text()
+        assert "## Reclassified" in body and "wrongly filed" in body
+        assert "'own-research' -> 'source-code'" in body
+
+    def test_it_runs_the_same_confidence_gate(self, ledger_root):
+        # Reclassifying must not be a way around the gate that `learn` enforces.
+        run(learn(source="source-code", confidence="high", sample_n=None))
+        lrn = f"lrn-{today()}-claim-a"
+        assert run(["reclassify", lrn, "--reason", "r", "--source", "intuition"]) == 2
+        assert fm_of(ledger_root, "lrn", lrn)["source"] == "source-code"
+
+    def test_moving_to_live_data_demands_a_sample_size(self, ledger_root):
+        run(learn(source="own-research", confidence="medium", sample_n=None))
+        lrn = f"lrn-{today()}-claim-a"
+        assert run(["reclassify", lrn, "--reason", "r", "--source", "live-data"]) == 2
+        assert run(["reclassify", lrn, "--reason", "r", "--source", "live-data",
+                    "--sample-n", "110", "--confidence", "high"]) == 0
+
+    def test_the_review_clock_follows_the_new_source(self, ledger_root):
+        run(learn(source="platform-doc", confidence="high", sample_n=None))
+        lrn = f"lrn-{today()}-claim-a"
+        before = fm_of(ledger_root, "lrn", lrn)["review_after"]
+        run(["reclassify", lrn, "--reason", "r", "--source", "competitor-observation",
+             "--confidence", "medium"])
+        # Recomputed from last_confirmed, not today — re-filing is not reconfirming.
+        assert fm_of(ledger_root, "lrn", lrn)["review_after"] < before
+
+    def test_the_claim_itself_cannot_be_changed(self):
+        # Evidence already attached was gathered against the claim as written.
+        import inspect
+
+        from ad_management_agent import research
+        assert "claim" not in inspect.signature(research.Research.reclassify).parameters
+
+    def test_passing_nothing_is_an_error(self, ledger_root):
+        run(learn())
+        assert run(["reclassify", f"lrn-{today()}-claim-a", "--reason", "r"]) == 2
+
+    def test_it_refuses_anything_that_is_not_a_learning(self, ledger_root):
+        run(ingest())
+        assert run(["reclassify", f"note-{today()}-note-a", "--reason", "r",
+                    "--source", "source-code"]) == 2
+
+
 class TestOneClaimPerFile:
     def test_a_duplicate_id_is_refused_and_points_at_log_evidence(self, ledger_root, capsys):
         run(learn())

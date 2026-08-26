@@ -123,6 +123,7 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 | `ingest` | Store a note you brought in, verbatim and immutable, as provenance for learnings |
 | `learn` | Record one derived claim, with the source kind and confidence that make it citable |
 | `log-evidence` | Attach a dated outcome to a learning — the back-edge that lets it be corrected |
+| `reclassify` | Correct how a learning is filed — subject, source, confidence — not what it claims |
 | `promote` | Record that a learning has graduated into a rules file and is now normative |
 | `retire` | Close out a learning that is no longer worth carrying |
 | `question` | Add an open research question to the queue that drives the next research pass |
@@ -189,19 +190,25 @@ ad-agent dump-ledger [-h] [--status {proposed,executing,live,reviewed,abandoned}
 #### `ingest`
 
 ```
-ad-agent ingest [-h] --title TITLE --source {live-data,platform-doc,own-research,competitor-observation,intuition} (--file FILE | --text TEXT) [--slug SLUG]
+ad-agent ingest [-h] --title TITLE --source {live-data,platform-doc,source-code,own-research,competitor-observation,intuition} (--file FILE | --text TEXT) [--slug SLUG]
 ```
 
 #### `learn`
 
 ```
-ad-agent learn [-h] --claim CLAIM --subject {audience,creative,channel,tracking,competitor,product,budget} --source {live-data,platform-doc,own-research,competitor-observation,intuition} --confidence {high,medium,low} [--sample-n SAMPLE_N] --evidence EVIDENCE [--derived-from DERIVED_FROM] [--answers ANSWERS] [--slug SLUG]
+ad-agent learn [-h] --claim CLAIM --subject {audience,creative,channel,tracking,competitor,product,budget} --source {live-data,platform-doc,source-code,own-research,competitor-observation,intuition} --confidence {high,medium,low} [--sample-n SAMPLE_N] --evidence EVIDENCE [--derived-from DERIVED_FROM] [--answers ANSWERS] [--slug SLUG]
 ```
 
 #### `log-evidence`
 
 ```
 ad-agent log-evidence [-h] --outcome {supported,contradicted,inconclusive} --text TEXT [--from FROM_REF] learning_id
+```
+
+#### `reclassify`
+
+```
+ad-agent reclassify [-h] --reason REASON [--subject {audience,creative,channel,tracking,competitor,product,budget}] [--source {live-data,platform-doc,source-code,own-research,competitor-observation,intuition}] [--confidence {high,medium,low}] [--sample-n SAMPLE_N] learning_id
 ```
 
 #### `promote`

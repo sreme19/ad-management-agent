@@ -691,6 +691,26 @@ def cmd_log_evidence(args: argparse.Namespace, ledger: Ledger) -> None:
     print(f"{rec.front_matter['id']} -> status={rec.front_matter['status']}")
 
 
+def cmd_reclassify(args: argparse.Namespace, ledger: Ledger) -> None:
+    if not any((args.subject, args.source, args.confidence, args.sample_n)):
+        print("error: nothing to reclassify — pass at least one of --subject, --source, "
+              "--confidence, --sample-n", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        rec, diff = _research(ledger).reclassify(
+            args.learning_id, subject=args.subject, source=args.source,
+            confidence=args.confidence, sample_n=args.sample_n, reason=args.reason,
+            today=_today())
+    except (researchmod.ResearchError, KeyError) as exc:
+        _research_fail(exc)
+    if not diff:
+        print(f"{rec.front_matter['id']}: no change — every field already had that value")
+        return
+    print(f"reclassified {rec.front_matter['id']}")
+    for field, (old, new) in sorted(diff.items()):
+        print(f"  {field}: {old!r} -> {new!r}")
+
+
 def cmd_promote(args: argparse.Namespace, ledger: Ledger) -> None:
     try:
         rec = _research(ledger).promote(args.learning_id, rule_file=args.rule, today=_today())
@@ -1255,6 +1275,18 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--from", dest="from_ref", default=None,
                     help="rec_id whose verdict produced this, if any")
     sp.set_defaults(func=cmd_log_evidence)
+
+    sp = sub.add_parser(
+        "reclassify",
+        help="Correct how a learning is filed — subject, source, confidence — not what it claims",
+    )
+    sp.add_argument("learning_id")
+    sp.add_argument("--reason", required=True, help="why the original filing was wrong")
+    sp.add_argument("--subject", default=None, choices=list(researchmod.SUBJECTS))
+    sp.add_argument("--source", default=None, choices=list(researchmod.SOURCES))
+    sp.add_argument("--confidence", default=None, choices=list(researchmod.CONFIDENCES))
+    sp.add_argument("--sample-n", default=None, type=int)
+    sp.set_defaults(func=cmd_reclassify)
 
     sp = sub.add_parser(
         "promote",

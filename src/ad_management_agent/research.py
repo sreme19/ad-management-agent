@@ -42,6 +42,7 @@ SUBJECTS = ("audience", "creative", "channel", "tracking", "competitor", "produc
 SOURCES = (
     "live-data",              # this account's own numbers, via ad-audit
     "platform-doc",           # Snap/Meta documentation or an official changelog
+    "source-code",            # read out of a codebase — ours or pocket-dating-coach's
     "own-research",           # the app owner's own reading and field notes
     "competitor-observation", # what a rival is visibly doing
     "intuition",              # a hypothesis worth testing, honestly labelled
@@ -49,10 +50,15 @@ SOURCES = (
 
 CONFIDENCES = ("high", "medium", "low")
 
-# Only a measured result or an authoritative document can carry `high`. Everything
-# else is a hypothesis, however plausible — capping it here is what makes the
-# library's own confidence field mean something.
-HIGH_CONFIDENCE_SOURCES = ("live-data", "platform-doc")
+# Only a measured result, an authoritative document, or something read directly out
+# of the code can carry `high`. Everything else is a hypothesis, however plausible —
+# capping it here is what makes the library's own confidence field mean something.
+#
+# `source-code` was added 2026-08-26, when the audience-classification break forced
+# a fact about pocket-dating-coach's `audienceOf()` — verifiable by reading a
+# function — to be filed as own-research/medium alongside hunches. Reading code is
+# as certain as reading a doc. What it is *not* is durable: see STALENESS_DAYS.
+HIGH_CONFIDENCE_SOURCES = ("live-data", "platform-doc", "source-code")
 
 LEARNING_STATUSES = ("open", "supported", "contradicted", "mixed", "promoted", "retired")
 QUESTION_STATUSES = ("open", "answered", "dropped")
@@ -67,6 +73,11 @@ MIN_SAMPLE = 30
 # How long a claim stays trustworthy without being reconfirmed. Competitor
 # creative rots fastest; a platform behaviour lasts longer; nothing lasts forever.
 STALENESS_DAYS = {
+    # A code claim is certain when read and cheap to re-check, but it describes
+    # something someone is actively changing — pocket-dating-coach is the most
+    # active repo in the portfolio, and one commit can invalidate it. High
+    # confidence and a short clock are the right pairing, not a contradiction.
+    "source-code": 60,
     "competitor-observation": 60,
     "intuition": 90,
     "own-research": 120,
@@ -91,6 +102,35 @@ def _short(text: str, words: int = 5) -> str:
     identify the claim well.
     """
     return slugify(" ".join(re.sub(r"[^\w\s-]", " ", text).split()[:words])) or "item"
+
+
+def check_confidence(*, source: str, confidence: str, sample_n: int | None) -> None:
+    """The confidence gate, shared by `learn` and `reclassify` so they cannot drift.
+
+    Two rules, both about not letting a guess and a measurement sit at the same
+    weight in a brief that spends money.
+    """
+    if confidence not in CONFIDENCES:
+        raise ResearchError(f"confidence must be one of {', '.join(CONFIDENCES)}")
+    if confidence == "high" and source not in HIGH_CONFIDENCE_SOURCES:
+        raise ResearchError(
+            f"a {source!r} claim cannot be `high` confidence.\n"
+            f"Only {', '.join(HIGH_CONFIDENCE_SOURCES)} can — everything else is a hypothesis\n"
+            "worth testing, however plausible. Use `medium` and let a test earn the upgrade."
+        )
+    if source == "live-data":
+        if sample_n is None:
+            raise ResearchError(
+                "a live-data claim needs a sample size. SPEC.md decision #6 gates every claim "
+                "about live performance on pocket-dating-coach's own MIN_SAMPLE floor, and a "
+                "sample size that is not written down cannot be checked against it."
+            )
+        if sample_n < MIN_SAMPLE and confidence != "low":
+            raise ResearchError(
+                f"n={sample_n} is below MIN_SAMPLE={MIN_SAMPLE}, so this is `inconclusive`, "
+                f"not a finding (SPEC.md decision #6).\nRecord it as `low` confidence, or as "
+                "an open question, rather than as something a brief can lean on."
+            )
 
 
 class Research:
@@ -184,30 +224,7 @@ class Research:
             raise ResearchError(f"subject must be one of {', '.join(SUBJECTS)}, got {subject!r}")
         if source not in SOURCES:
             raise ResearchError(f"source must be one of {', '.join(SOURCES)}, got {source!r}")
-        if confidence not in CONFIDENCES:
-            raise ResearchError(f"confidence must be one of {', '.join(CONFIDENCES)}")
-
-        # The confidence gate. Two rules, both about not letting a guess and a
-        # measurement sit at the same weight in a brief that spends money.
-        if confidence == "high" and source not in HIGH_CONFIDENCE_SOURCES:
-            raise ResearchError(
-                f"a {source!r} claim cannot be `high` confidence.\n"
-                f"Only {' or '.join(HIGH_CONFIDENCE_SOURCES)} can — everything else is a hypothesis\n"
-                "worth testing, however plausible. Use `medium` and let a test earn the upgrade."
-            )
-        if source == "live-data":
-            if sample_n is None:
-                raise ResearchError(
-                    "a live-data claim needs --sample-n. SPEC.md decision #6 gates every claim "
-                    "about live performance on pocket-dating-coach's own MIN_SAMPLE floor, and a "
-                    "sample size that is not written down cannot be checked against it."
-                )
-            if sample_n < MIN_SAMPLE and confidence != "low":
-                raise ResearchError(
-                    f"n={sample_n} is below MIN_SAMPLE={MIN_SAMPLE}, so this is `inconclusive`, "
-                    f"not a finding (SPEC.md decision #6).\nRecord it as `low` confidence, or as "
-                    "an open question, rather than as something a brief can lean on."
-                )
+        check_confidence(source=source, confidence=confidence, sample_n=sample_n)
 
         if derived_from is not None:
             note = self.find(derived_from)
@@ -307,6 +324,65 @@ class Research:
         rec.body = rec.body.rstrip() + f"\n- ({today}) **{outcome}**{origin}: {text.strip()}\n"
         rec.save()
         return rec
+
+    def reclassify(
+        self,
+        learning_id: str,
+        *,
+        subject: str | None,
+        source: str | None,
+        confidence: str | None,
+        sample_n: int | None,
+        reason: str,
+        today: str,
+    ) -> tuple[Record, dict]:
+        """Correct how a claim is filed, without touching what it claims.
+
+        Not evidence and not an amendment of the claim — a correction of the
+        metadata. It exists because filing is fallible: a claim can go in under the
+        wrong subject, or under a source kind that misstates how certain it is. The
+        first real case was the `audienceOf()` finding, filed as own-research/medium
+        because no `source-code` kind existed yet.
+
+        **The claim text itself is deliberately not changeable here.** Evidence
+        already attached was gathered against the claim as written; letting the
+        wording move underneath it would make the whole trail lie. A claim that
+        turned out to be the wrong claim is `retire` plus a new atom, not an edit.
+
+        The review clock is recomputed from `last_confirmed`, not from today —
+        re-filing something is not reconfirming it.
+        """
+        rec = self.find(learning_id)
+        if not learning_id.startswith("lrn-"):
+            raise ResearchError(f"{learning_id!r} is not a learning")
+
+        fm = rec.front_matter
+        new = {
+            "subject": subject if subject is not None else fm.get("subject"),
+            "source": source if source is not None else fm.get("source"),
+            "confidence": confidence if confidence is not None else fm.get("confidence"),
+            "sample_n": sample_n if sample_n is not None else fm.get("sample_n"),
+        }
+        if new["subject"] not in SUBJECTS:
+            raise ResearchError(f"subject must be one of {', '.join(SUBJECTS)}")
+        if new["source"] not in SOURCES:
+            raise ResearchError(f"source must be one of {', '.join(SOURCES)}")
+        check_confidence(source=new["source"], confidence=new["confidence"],
+                         sample_n=new["sample_n"])
+
+        diff = {k: (fm.get(k), v) for k, v in new.items() if fm.get(k) != v}
+        if not diff:
+            return rec, diff
+
+        fm.update(new)
+        fm["review_after"] = _add_days(str(fm.get("last_confirmed") or today),
+                                       STALENESS_DAYS[new["source"]])
+        rows = "\n".join(f"- `{k}`: {old!r} -> {v!r}" for k, (old, v) in sorted(diff.items()))
+        rec.body = rec.body.rstrip() + (
+            f"\n\n## Reclassified ({today})\n\n- Reason: {reason.strip()}\n{rows}\n"
+        )
+        rec.save()
+        return rec, diff
 
     def promote(self, learning_id: str, *, rule_file: str, today: str) -> Record:
         """Mark a learning as having graduated into a rules file.

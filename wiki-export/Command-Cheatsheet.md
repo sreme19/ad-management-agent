@@ -46,6 +46,7 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 | `ingest` | Store a note you brought in, verbatim and immutable, as provenance for learnings |
 | `learn` | Record one derived claim, with the source kind and confidence that make it citable |
 | `log-evidence` | Attach a dated outcome to a learning — the back-edge that lets it be corrected |
+| `reclassify` | Correct how a learning is filed — subject, source, confidence — not what it claims |
 | `promote` | Record that a learning has graduated into a rules file and is now normative |
 | `retire` | Close out a learning that is no longer worth carrying |
 | `question` | Add an open research question to the queue that drives the next research pass |
@@ -112,19 +113,25 @@ ad-agent dump-ledger [-h] [--status {proposed,executing,live,reviewed,abandoned}
 #### `ingest`
 
 ```
-ad-agent ingest [-h] --title TITLE --source {live-data,platform-doc,own-research,competitor-observation,intuition} (--file FILE | --text TEXT) [--slug SLUG]
+ad-agent ingest [-h] --title TITLE --source {live-data,platform-doc,source-code,own-research,competitor-observation,intuition} (--file FILE | --text TEXT) [--slug SLUG]
 ```
 
 #### `learn`
 
 ```
-ad-agent learn [-h] --claim CLAIM --subject {audience,creative,channel,tracking,competitor,product,budget} --source {live-data,platform-doc,own-research,competitor-observation,intuition} --confidence {high,medium,low} [--sample-n SAMPLE_N] --evidence EVIDENCE [--derived-from DERIVED_FROM] [--answers ANSWERS] [--slug SLUG]
+ad-agent learn [-h] --claim CLAIM --subject {audience,creative,channel,tracking,competitor,product,budget} --source {live-data,platform-doc,source-code,own-research,competitor-observation,intuition} --confidence {high,medium,low} [--sample-n SAMPLE_N] --evidence EVIDENCE [--derived-from DERIVED_FROM] [--answers ANSWERS] [--slug SLUG]
 ```
 
 #### `log-evidence`
 
 ```
 ad-agent log-evidence [-h] --outcome {supported,contradicted,inconclusive} --text TEXT [--from FROM_REF] learning_id
+```
+
+#### `reclassify`
+
+```
+ad-agent reclassify [-h] --reason REASON [--subject {audience,creative,channel,tracking,competitor,product,budget}] [--source {live-data,platform-doc,source-code,own-research,competitor-observation,intuition}] [--confidence {high,medium,low}] [--sample-n SAMPLE_N] learning_id
 ```
 
 #### `promote`
@@ -244,9 +251,11 @@ ad-agent learn --claim "..." --subject audience|creative|channel|tracking|compet
 
 One claim per file. The two gates are the point of the whole store:
 
-- **`--confidence high` is refused unless the source is `live-data` or `platform-doc`.** Your own
-  reading, a competitor observation, an informed hunch — all cap at `medium`, however plausible. A
-  test earns the upgrade.
+- **`--confidence high` is refused unless the source is `live-data`, `platform-doc` or
+  `source-code`.** Your own reading, a competitor observation, an informed hunch — all cap at
+  `medium`, however plausible. A test earns the upgrade. `source-code` is for a fact read out of a
+  codebase: as certain as a doc when read, but on a 60-day clock, because one commit can invalidate
+  it.
 - **A `live-data` claim must state `--sample-n`, and below `MIN_SAMPLE = 30` it can only be `low`.**
   That is SPEC.md decision #6, inherited from `pocket-dating-coach`'s own `ad-analytics.ts`, applied
   so a brief cannot lean on a number the dashboard itself would call inconclusive.
@@ -271,6 +280,21 @@ never corrects itself — and a store that confidently records wrong things is w
 `supported` and `contradicted` move an open claim; the two arriving in either order make it `mixed`,
 not whichever came last. `inconclusive` records the evidence and leaves the status alone. `supported`
 also resets the review clock.
+
+### "That claim was filed wrong"
+
+```
+ad-agent reclassify <learning-id> --reason "..." [--subject ...] [--source ...] \
+  [--confidence ...] [--sample-n <n>]
+```
+
+Corrects how a claim is filed, not what it claims. Runs the same confidence gate as `learn`, so it is
+not a way around the ceiling; records a dated `## Reclassified` section; and recomputes the review
+clock from `last_confirmed`, since re-filing is not reconfirming.
+
+**The claim text cannot be changed here.** Evidence already attached was gathered against the claim as
+written — letting the wording move underneath it would make the trail lie. A claim that turned out to
+be the wrong claim is `retire` plus a new atom.
 
 ### "That claim is now a rule" / "that claim is dead"
 
