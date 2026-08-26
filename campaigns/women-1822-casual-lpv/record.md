@@ -187,3 +187,15 @@ Post-launch tracking check PASSED at 15:53 UTC, 38 minutes after enable. 65 land
 Delivery is far faster than planned: 16,941 impressions and Rs 105 of the Rs 300 daily cap consumed in 38 minutes. At that pace the cap is exhausted inside about two hours and the ad set goes dark until midnight, so each day is one short burst rather than steady delivery.
 
 Two consequences for how this gets read. First, budget.md's kill/double gate of 50-100 landing-page views was reached in 38 minutes, far sooner than that rule anticipated — but the ad set is still flagged LEARNING_PHASE by Snap, so reviewing now would judge it on delivery the algorithm has not finished calibrating. The gate needs 'and out of learning phase', not just a view count. Second, store taps are 1 of 65 views. That is a single event and says nothing yet; it is recorded so the next reader knows it was seen and deliberately not treated as a signal.
+
+## Note — incident (2026-08-26)
+
+This ad set's traffic classifies as audience=unknown, not women. 103 views today, none of which fetch-analytics --audience women can see.
+
+Cause: pocket-dating-coach's audienceOf() infers audience by finding gender words in the campaign name and utm_* values, because the landing page itself has no identity signal and deliberately never will. Older ad sets carried readable names in utm_campaign (sc_men_28_38_blr_casual) and classified cleanly. This ad set follows naming.md and tracking.md, so utm_term carries the ad squad UUID and utm_campaign is RA_TRAFFIC_GET_IN_PAN_TOF_202608 — no gender word appears anywhere in the URL.
+
+So conforming to the naming and tracking rules broke the audience cut, and every ad set created through snap-push will inherit it. The ID-based scheme is what made ad-level attribution work this afternoon, so the scheme is not the thing to change.
+
+Right fix: audienceOf() should classify on the resolved ad-set name rather than the raw row. The analytics already recovers that name — the leaderboard displays WOMEN_18-22_CASUAL_LPV correctly for these very rows — so the information is present, just not where the classifier looks. Quick alternative: carry the ad-set name in utm_content alongside the ad name, which costs nothing on Snap where utm_id is the join, but changes what utm_content means on Meta.
+
+Practical effect meanwhile: any men-vs-women split in ad-audit is blind to this ad set. Read it by ad-set id, not by audience filter.
