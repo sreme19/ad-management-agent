@@ -33,13 +33,24 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
      verdict gate. An approved idea feeds into `ad-setup-loop`.
    - `ad-intake` — mode 8: you paste or describe an ad you found elsewhere; the skill learns from it and
      can feed a resulting idea into `ad-setup-loop`. Direct analog of job-hunt's `linkedin-opportunity`.
-3. **The non-negotiable boundary (locked, survives any future plugin):** this agent never calls a Meta
-   or Snap Ads Manager API to create, publish, enable, or change budget on anything live. Every
-   `ad-setup-loop` output is instructions a human executes by hand in Ads Manager. "Steers
-   implementation" (the eventual Claude plugin the user described) means telling the human what to
-   click, field by field — never clicking it. Money and audience reach are on the line, not just an
-   account ban (the reasoning job-hunt used for its own "never automate a send" rule) — this rule is
-   stricter, not looser.
+3. **The boundary, as amended 2026-08-26.** Originally: this agent never calls a Meta or Snap Ads
+   Manager API at all, and every `ad-setup-loop` output is instructions a human executes by hand.
+   **The app owner lifted that on 2026-08-26**, explicitly and after the trade-off was put to them,
+   so that setup could be automated. What stands now:
+
+   - The agent **may create** campaigns, ad squads, creatives and ads on Snap, through
+     `ad-agent snap-push`, and **only ever with status `PAUSED`**.
+   - The agent **never enables anything, and never changes the budget of anything live.** There is no
+     enable, resume or activate call anywhere in `snap.py`, and none is to be added without the app
+     owner saying so in as many words. Starting spend stays a human action in Ads Manager.
+   - Every created object is **read back from the API and diffed** against the plan before the command
+     exits. A 200 from a POST is not evidence that an ad squad targets who you think it targets.
+
+   **Be clear about what was lost.** The old rule was enforced by decision #10 — the agent held no
+   credential that could reach a live account, so "never touches a live account" was true by
+   construction. That is now true only because this code is careful. It is a weaker kind of guarantee,
+   and the paused-only rule above is what carries the weight instead. Meta is unchanged and remains
+   fully hands-off; this amendment covers Snap only.
 4. **The close-the-loop step is mandatory, not optional.** A `propose`d recommendation with no
    `log-setup` sits as an open loose end forever; `ad-audit` cannot join a recommendation to a real
    outcome without the real `ad_set_id` on record. See "Ledger" below for the exact lifecycle.
@@ -70,10 +81,15 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
    one less thing to context-switch on. The CLI has no dependency on `pocket-dating-coach`'s TypeScript
    beyond calling its JSON endpoint over HTTP.
 9. **Repo is private.** Targeting, budget figures, and creative strategy are business-sensitive.
-10. **No Meta/Snap Marketing API credentials held by this agent, at all.** Research (modes 7/8) works
-    from `pocket-dating-coach`'s exports plus the public Meta Ads Library / Snap ad search — never a
-    direct, credentialed connection to either ad platform. This is what makes #3 structurally true
-    rather than merely a policy: the agent has no credential that *could* touch a live account.
+10. **Credentials, as amended 2026-08-26.** Originally: no Meta or Snap Marketing API credentials in
+    this repo at all, which is what made #3 structurally true rather than merely a policy. **Amended
+    for Snap only, by the app owner, on the same call as #3.** `config.local.yaml` (gitignored) now
+    holds a Snap OAuth client id, client secret and refresh token for the `riteangle-marketing-api`
+    app, scoped `snapchat-marketing-api`.
+
+    **No Meta credentials, still — that half of #10 stands unamended.** Research for modes 7/8 continues
+    to work from `pocket-dating-coach`'s exports plus the public Meta Ads Library and Snap ad search.
+    Access tokens are minted per run from the refresh token and never written to disk.
 11. **The destination has an audience, and the gate that enforces it is hard.** `propose` refuses to
     write a record whose ad-set audience doesn't match the framing of its landing page, per
     `rules/destinations.yaml`. There is no override flag and `amend` cannot launder one — a blocked
@@ -110,10 +126,11 @@ they are load-bearing: the iOS build was actually rejected under App Store Guide
 
 ## Non-negotiables (never automate a live account — see decision #3)
 
-- Never call a Meta or Snap Ads Manager API to create, publish, enable, or change budget on anything
-  live.
-- Never hold Meta/Snap Marketing API credentials (decision #10) — there is no credential in this repo
-  that could touch a live account even by accident.
+- **Never enable anything, and never change the budget of anything already live**, on either network.
+  Creation is permitted on Snap and only ever `PAUSED` (decision #3, as amended 2026-08-26); starting
+  spend is a human action, every time.
+- Never call a Meta Ads Manager API at all, and never hold Meta Marketing API credentials — that half
+  of decision #10 is unamended.
 - Never give this agent read access to member-data tables (decision #7's PII boundary).
 
 ## Architecture
@@ -123,6 +140,8 @@ Skill (live reasoning, in a Claude Code session)
   → does the actual research / targeting / creative work
   → persists through ad-agent's zero-API CLI (this repo)
        propose / amend / log-setup / log-review / abandon / stats / dump-ledger
+  → optionally creates the ad set on Snap, PAUSED, and diffs it back
+       snap-push   (decision #3 as amended — creates, never enables)
   → pulls read-only data through ad-agent's zero-API CLI
        fetch-analytics  (channel 1: pocket-dating-coach's authenticated endpoint)
 ```

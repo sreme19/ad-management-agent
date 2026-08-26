@@ -23,3 +23,19 @@ pdc:
   # Used only for raw/exploratory queries the analytics endpoint doesn't
   # answer; never to recompute a rate or verdict the endpoint already owns.
   readonly_db_url: ""
+
+snap:
+  # Snap Marketing API credentials, for `ad-agent snap ...`. Registered under
+  # Business Manager > Business details > OAuth apps; the client secret is shown
+  # once at creation and cannot be regenerated, so keep it somewhere durable.
+  #
+  # NOTE: holding these reverses SPEC.md decision #10, which deliberately kept
+  # any credential that could reach a live ad account out of this repo. That
+  # reversal is the app owner's explicit call (2026-08-26) and is recorded in
+  # SPEC.md — it is not an oversight.
+  client_id: ""
+  client_secret: ""
+  redirect_uri: ""
+  ad_account_id: ""
+  refresh_token: ""
+  profile_id: ""

@@ -1,0 +1,219 @@
+"""Snap Marketing API client.
+
+SPEC.md decisions #3 and #10 originally kept every credential that could reach a
+live ad account out of this repo, so that "never touches a live account" was true
+by construction rather than by care. The app owner reversed that on 2026-08-26 to
+allow programmatic setup. What replaces the structural guarantee is this module's
+own discipline, and it is deliberately narrow:
+
+  * Everything is created PAUSED. Nothing here can start spending money.
+  * There is no enable/resume call anywhere in this file, and none should be added
+    without the app owner saying so explicitly. Enabling stays a human action in
+    Ads Manager.
+  * Every object is read back from the API after creation and diffed against what
+    was asked for, because "the POST returned 200" is not evidence the ad squad
+    targets who you think it targets.
+
+Amounts are micro-currency throughout: 1 INR = 1_000_000 micro.
+"""
+from __future__ import annotations
+
+import json
+import mimetypes
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+API = "https://adsapi.snapchat.com/v1"
+TOKEN_URL = "https://accounts.snapchat.com/login/oauth2/access_token"
+MICRO = 1_000_000
+
+
+class SnapError(RuntimeError):
+    pass
+
+
+class SnapClient:
+    def __init__(self, cfg: dict):
+        missing = [k for k in ("client_id", "client_secret", "refresh_token", "ad_account_id")
+                   if not (cfg or {}).get(k)]
+        if missing:
+            raise SnapError(
+                "config.local.yaml is missing snap." + ", snap.".join(missing) + ".\n"
+                "See config.example.yaml for the expected block."
+            )
+        self.cfg = cfg
+        self._token: str | None = None
+
+    # ---- transport -------------------------------------------------------
+    @property
+    def token(self) -> str:
+        """Access tokens last an hour, so they are minted per run, never stored."""
+        if self._token is None:
+            body = urllib.parse.urlencode({
+                "client_id": self.cfg["client_id"],
+                "client_secret": self.cfg["client_secret"],
+                "grant_type": "refresh_token",
+                "refresh_token": self.cfg["refresh_token"],
+            }).encode()
+            req = urllib.request.Request(
+                TOKEN_URL, data=body, method="POST",
+                headers={"content-type": "application/x-www-form-urlencoded"})
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    self._token = json.loads(r.read())["access_token"]
+            except urllib.error.HTTPError as e:
+                raise SnapError(
+                    f"could not refresh the access token (HTTP {e.code}). The refresh token may "
+                    f"have been revoked — re-run the authorize step.\n{e.read().decode()[:300]}"
+                ) from e
+        return self._token
+
+    def _call(self, method: str, path: str, payload: dict | None = None) -> dict:
+        data = json.dumps(payload).encode() if payload is not None else None
+        req = urllib.request.Request(
+            f"{API}{path}", data=data, method=method,
+            headers={"Authorization": f"Bearer {self.token}", "content-type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            raise SnapError(f"{method} {path} -> HTTP {e.code}\n{e.read().decode()[:800]}") from e
+
+    def get(self, path: str) -> dict:
+        return self._call("GET", path)
+
+    def post(self, path: str, payload: dict) -> dict:
+        return self._call("POST", path, payload)
+
+    def put(self, path: str, payload: dict) -> dict:
+        return self._call("PUT", path, payload)
+
+    # ---- helpers ---------------------------------------------------------
+    @staticmethod
+    def _one(res: dict, key: str) -> dict:
+        """Snap wraps every object in a list under a plural key, one entry per request item."""
+        items = res.get(key) or []
+        if not items:
+            raise SnapError(f"expected one {key} in the response, got none: {json.dumps(res)[:300]}")
+        obj = items[0]
+        singular = key.rstrip("s") if key != "adsquads" else "adsquad"
+        inner = obj.get(singular, obj)
+        if obj.get("sub_request_status") not in (None, "SUCCESS"):
+            raise SnapError(f"{singular} rejected: {json.dumps(obj)[:500]}")
+        return inner
+
+    # ---- campaign --------------------------------------------------------
+    def find_campaign(self, name: str) -> dict | None:
+        """Exact-name lookup that refuses to guess.
+
+        Two live campaigns in this account already share the name
+        RA_TRAFFIC_GET_IN_BLR_TOF_202608 with different ids, which is precisely the
+        collision rules/naming.md warns about. Hanging an ad squad off the wrong one
+        would be invisible until the numbers made no sense, so an ambiguous name is
+        an error, never a pick-the-first.
+        """
+        res = self.get(f"/adaccounts/{self.cfg['ad_account_id']}/campaigns")
+        hits = [c["campaign"] for c in res.get("campaigns", []) if c["campaign"].get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h["id"] for h in hits)
+            raise SnapError(
+                f"{len(hits)} campaigns are named {name!r} ({ids}).\n"
+                "Refusing to guess which one to use — rename or delete the duplicate in Ads "
+                "Manager first. See rules/naming.md."
+            )
+        return hits[0] if hits else None
+
+    def create_campaign(self, name: str, start_time: str) -> dict:
+        res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/campaigns", {"campaigns": [{
+            "name": name,
+            "ad_account_id": self.cfg["ad_account_id"],
+            "status": "PAUSED",
+            "start_time": start_time,
+            "buy_model": "AUCTION",
+            "objective_v2_properties": {"objective_v2_type": "TRAFFIC"},
+        }]})
+        return self._one(res, "campaigns")
+
+    # ---- ad squad --------------------------------------------------------
+    def create_adsquad(self, *, name, campaign_id, targeting, daily_budget_inr,
+                       start_time, end_time) -> dict:
+        res = self.post(f"/campaigns/{campaign_id}/adsquads", {"adsquads": [{
+            "name": name,
+            "campaign_id": campaign_id,
+            "type": "SNAP_ADS",
+            "status": "PAUSED",
+            "targeting": targeting,
+            "optimization_goal": "LANDING_PAGE_VIEW",
+            "billing_event": "IMPRESSION",
+            "bid_strategy": "AUTO_BID",
+            "daily_budget_micro": int(daily_budget_inr * MICRO),
+            "placement_v2": {"config": "AUTOMATIC"},
+            "start_time": start_time,
+            "end_time": end_time,
+        }]})
+        return self._one(res, "adsquads")
+
+    # ---- media + creative + ad -------------------------------------------
+    def upload_media(self, name: str, path: Path) -> dict:
+        media = self._one(self.post(f"/adaccounts/{self.cfg['ad_account_id']}/media", {"media": [{
+            "ad_account_id": self.cfg["ad_account_id"], "name": name, "type": "IMAGE",
+        }]}), "media")
+
+        boundary = uuid.uuid4().hex
+        ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        body = b"".join([
+            f"--{boundary}\r\n".encode(),
+            f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'.encode(),
+            f"Content-Type: {ctype}\r\n\r\n".encode(),
+            path.read_bytes(), b"\r\n", f"--{boundary}--\r\n".encode(),
+        ])
+        req = urllib.request.Request(
+            f"{API}/media/{media['id']}/upload", data=body, method="POST",
+            headers={"Authorization": f"Bearer {self.token}",
+                     "content-type": f"multipart/form-data; boundary={boundary}"})
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                r.read()
+        except urllib.error.HTTPError as e:
+            raise SnapError(f"media upload -> HTTP {e.code}\n{e.read().decode()[:500]}") from e
+        return media
+
+    def create_creative(self, *, name, media_id, headline, brand_name, url, profile_id) -> dict:
+        if len(headline) > 34:
+            raise SnapError(f"headline is {len(headline)} chars; Snap's limit is 34: {headline!r}")
+        res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/creatives", {"creatives": [{
+            "ad_account_id": self.cfg["ad_account_id"],
+            "name": name, "type": "WEB_VIEW",
+            "headline": headline, "brand_name": brand_name,
+            "call_to_action": "MORE", "shareable": True,
+            "top_snap_media_id": media_id,
+            "web_view_properties": {"url": url},
+            "profile_properties": {"profile_id": profile_id},
+        }]})
+        return self._one(res, "creatives")
+
+    def set_creative_url(self, creative: dict, url: str) -> dict:
+        """Rewrite the landing URL once the real ad id exists.
+
+        rules/tracking.md requires utm_id to carry the ad id, and the ad does not
+        exist when the creative is created. Ads Manager solves this with a {{ad.id}}
+        macro — the same macro whose silent non-resolution cost a week of spend on
+        2026-08-21. Here the id is known for certain by the time this runs, so the
+        URL is written literally and there is no macro left to fail.
+        """
+        body = {k: creative[k] for k in ("id", "ad_account_id", "name", "type", "headline",
+                                         "brand_name", "call_to_action", "shareable",
+                                         "top_snap_media_id", "profile_properties")
+                if k in creative}
+        body["web_view_properties"] = {"url": url}
+        return self._one(self.put(f"/adaccounts/{self.cfg['ad_account_id']}/creatives",
+                                  {"creatives": [body]}), "creatives")
+
+    def create_ad(self, *, name, ad_squad_id, creative_id) -> dict:
+        return self._one(self.post(f"/adsquads/{ad_squad_id}/ads", {"ads": [{
+            "ad_squad_id": ad_squad_id, "creative_id": creative_id,
+            "name": name, "type": "REMOTE_WEBPAGE", "status": "PAUSED",
+        }]}), "ads")
