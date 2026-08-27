@@ -29,6 +29,9 @@ duration_days: 5
 from_idea: idea-2026-08-27-breakup-reentry-second-chapter
 created: '2026-08-27'
 last_note: '2026-08-27'
+campaign_daily_cap_inr: null
+campaign_lifetime_cap_inr: null
+campaign_caps_verified: '2026-08-28'
 ---
 
 ## Brief (proposed)

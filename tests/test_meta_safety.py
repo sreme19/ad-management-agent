@@ -244,3 +244,71 @@ class TestTheAccountsOwnConventionNotSnaps:
                             property(lambda self: "USD"))
         with pytest.raises(metaapi.MetaError, match="not INR"):
             client.require_inr()
+
+
+class TestBudgetSharingIsAlwaysOff:
+    """Meta requires is_adset_budget_sharing_enabled on a no-campaign-budget campaign.
+
+    Discovered on 2026-08-28 when the first real push failed at create_campaign. The
+    value is not a preference: True hands Meta 20% of every child ad set's budget to
+    redistribute, which is a softer form of the campaign-budget-optimisation parent
+    that meta-push refuses outright. On a Rs 1,000/day ad set that is Rs 200/day of
+    drift — the difference between clearing rules/budget.md's Rs 800 floor and not.
+    """
+
+    def test_campaign_creation_sets_it_false(self):
+        import inspect
+        src = inspect.getsource(metaapi.MetaClient.create_campaign)
+        body = src.split('"""')[-1]
+        assert '"is_adset_budget_sharing_enabled": False' in body, (
+            "budget sharing must be explicitly False on every campaign this creates"
+        )
+        assert "True" not in body.split("is_adset_budget_sharing_enabled")[1][:40]
+
+    def test_flipping_it_on_an_existing_campaign_is_refused(self):
+        # Settable at creation (Meta requires it); a change afterwards is a budget
+        # change, because it alters what the child ad sets actually spend.
+        assert violations("POST", UPDATE_ADSET, {"is_adset_budget_sharing_enabled": True})
+        assert violations("POST", "/23841", {"is_adset_budget_sharing_enabled": False})
+        assert violations("POST", CREATE_CAMPAIGNS,
+                          {"is_adset_budget_sharing_enabled": False}) == []
+
+
+class TestTheAuthHintDoesNotMisfire:
+    def test_a_validation_error_labelled_oauthexception_gets_no_auth_hint(self):
+        # Meta returns type OAuthException for plain validation failures. Keying the
+        # hint off that type printed "check your asset assignments" under an error
+        # about a missing field, which sends the reader to the wrong place entirely.
+        import inspect
+        src = inspect.getsource(metaapi.MetaClient._call)
+        assert '"OAuth" in detail' not in src
+        assert "access token" in src
+
+
+class TestObjectsAreCreatedOnTheRightEndpoint:
+    """Meta's parent/child creation endpoints are not Snap's, and the difference bites.
+
+    snap.py creates an ad squad at /campaigns/{id}/adsquads. Meta's campaign node
+    exposes `adsets` as a read-only edge, so the same shape 400s with a message that
+    blames permissions — which sent the first real push (2026-08-28) looking at asset
+    assignments for a campaign its own token had just created.
+    """
+
+    def test_adsets_are_created_on_the_ad_account_not_the_campaign(self):
+        import inspect
+        src = inspect.getsource(metaapi.MetaClient.create_adset)
+        body = src.split('"""')[-1]
+        assert "/adsets" in body
+        assert "{campaign_id}/adsets" not in body, (
+            "ad sets must be created on the ad account with campaign_id in the body"
+        )
+        assert "account_path" in body
+
+    def test_every_create_still_classifies_as_a_create(self):
+        # The guard keys off the last path segment, so moving a create between
+        # parents must not accidentally reclassify it as an update and start
+        # refusing its budget.
+        for path in ("/act_1/adsets", "/act_1/campaigns", "/act_1/ads",
+                     "/act_1/adcreatives", "/act_1/adimages"):
+            assert metaapi._is_create("POST", path), path
+            assert violations("POST", path, {"daily_budget": 100_000}) == []

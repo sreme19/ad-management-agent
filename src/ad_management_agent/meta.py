@@ -89,6 +89,11 @@ BUDGET_KEYS = {
     "daily_spend_cap",
     "campaign_daily_budget",
     "campaign_lifetime_budget",
+    # Not an amount, but a change to how much an ad set actually spends: flipping
+    # this True on an existing campaign hands 20% of every child ad set's budget to
+    # Meta to redistribute. Guarded like the amounts — settable at creation,
+    # refused on an update.
+    "is_adset_budget_sharing_enabled",
 }
 
 # A POST whose final path segment is one of these is creating a new object under a
@@ -215,7 +220,14 @@ class MetaClient:
         except urllib.error.HTTPError as e:
             detail = e.read().decode()[:800]
             hint = ""
-            if e.code in (400, 401, 403) and "OAuth" in detail:
+            # Meta labels a great many pure validation errors `OAuthException` —
+            # the missing is_adset_budget_sharing_enabled field on 2026-08-28 came
+            # back as one — so keying the auth hint off that type alone printed
+            # "check your asset assignments" under an error that had nothing to do
+            # with permissions. Look for the words that actually mean auth.
+            authish = any(w in detail.lower() for w in (
+                "access token", "permission", "not authorized", "session"))
+            if e.code in (400, 401, 403) and authish:
                 hint = (
                     "\n\nA system-user token does not expire, so an auth failure here is more "
                     "likely a missing asset assignment than a stale token: check that "
@@ -321,6 +333,17 @@ class MetaClient:
             "status": "PAUSED",
             "special_ad_categories": [],
             "buying_type": "AUCTION",
+            # Required by Meta whenever the campaign carries no budget of its own,
+            # and there is only one defensible value here. Meta's own error text:
+            # "Passing in True will enable your ad sets to share 20% of their budget
+            # to optimize overall performance." That is a softer version of exactly
+            # what _gate_campaign_budget_optimization refuses outright — a parent
+            # that redistributes budget makes the record's budget_cap_inr_per_day
+            # stop describing what actually gets spent, and rules/budget.md's floor
+            # was checked against that number. 20% of Rs 1,000/day is Rs 200/day of
+            # drift, which is the difference between clearing the Rs 800 floor and
+            # not. So: False, always, and it is not a parameter.
+            "is_adset_budget_sharing_enabled": False,
         })
 
     # ---- stopping spend --------------------------------------------------
@@ -348,6 +371,33 @@ class MetaClient:
         return after
 
     # ---- ad set ----------------------------------------------------------
+    def find_adset(self, name: str, campaign_id: str) -> dict | None:
+        """Exact-name lookup under one campaign, so a retry resumes instead of duplicating.
+
+        This exists because `meta-push` has no rollback and five objects to create.
+        On 2026-08-28 the first real push failed at the creative — the third of five —
+        leaving a campaign and an ad set behind. `find_campaign` meant the retry
+        reused the campaign, but nothing looked for the ad set, so a second run would
+        have created a second `WOMEN_25-30_CASUAL_MOVEON-LPV` at another Rs 1,000/day
+        under the same parent. Two identically named ad sets is precisely the
+        collision `find_campaign` refuses to guess through, and it would have broken
+        `pocket-dating-coach`'s ad-set rollup, which is keyed on the ad set.
+
+        Scoped to the campaign, not the account: the same audience name under a
+        different campaign is a different test, and reusing across parents would
+        silently attach this record to someone else's.
+        """
+        res = self.get(f"/{campaign_id}/adsets", fields="id,name,status,daily_budget")
+        hits = [a for a in res.get("data", []) if a.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h["id"] for h in hits)
+            raise MetaError(
+                f"{len(hits)} ad sets under campaign {campaign_id} are named {name!r} "
+                f"({ids}).\nRefusing to guess which one this record means — delete or "
+                "rename the duplicate in Ads Manager first. See rules/naming.md."
+            )
+        return hits[0] if hits else None
+
     def create_adset(self, *, name, campaign_id, targeting, daily_budget_inr,
                      start_time, end_time, pixel_id=None) -> dict:
         """Create the ad set, PAUSED, optimising for landing-page views.
@@ -373,7 +423,15 @@ class MetaClient:
         path when someone builds it, not a flag on this one.
         """
         self.require_inr()
-        return self.post(f"/{campaign_id}/adsets", {
+        # Created on the AD ACCOUNT, with campaign_id in the body — not on the
+        # campaign. snap.py posts an ad squad to /campaigns/{id}/adsquads, and
+        # mirroring that shape here failed on 2026-08-28 with "Object with ID ...
+        # does not exist, cannot be loaded due to missing permissions, or does not
+        # support this operation": Meta's campaign node exposes `adsets` as a
+        # READ-ONLY edge, so the POST was to a real object that simply does not
+        # accept one. The error names permissions first, which is misleading — the
+        # campaign had just been created by this same token.
+        return self.post(f"/{self.account_path}/adsets", {
             "name": name,
             "campaign_id": campaign_id,
             "status": "PAUSED",

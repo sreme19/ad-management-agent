@@ -697,11 +697,20 @@ def cmd_meta_push(args: argparse.Namespace, ledger: Ledger) -> None:
         print("\n--dry-run: nothing created.")
         return
 
-    adset = client.create_adset(name=fm["ad_set_name"], campaign_id=campaign["id"],
-                                targeting=targeting, daily_budget_inr=budget,
-                                start_time=iso(start), end_time=iso(end),
-                                pixel_id=(config.get("meta") or {}).get("pixel_id"))
-    print(f"ad set    created {adset['id']}")
+    # Resume rather than duplicate. There is no rollback here and five objects to
+    # create, so a run that dies partway is a normal state to recover from, not an
+    # anomaly — see find_adset for the 2026-08-28 case this comes from. The read-back
+    # below diffs a reused ad set against the record just as hard as a new one, so
+    # reuse cannot smuggle in the wrong budget or audience.
+    adset = client.find_adset(fm["ad_set_name"], campaign["id"])
+    if adset:
+        print(f"ad set    reusing {adset['id']} (already existed under this campaign)")
+    else:
+        adset = client.create_adset(name=fm["ad_set_name"], campaign_id=campaign["id"],
+                                    targeting=targeting, daily_budget_inr=budget,
+                                    start_time=iso(start), end_time=iso(end),
+                                    pixel_id=(config.get("meta") or {}).get("pixel_id"))
+        print(f"ad set    created {adset['id']}")
 
     image_hash = client.upload_image(asset)
     print(f"image     uploaded hash={image_hash}")
