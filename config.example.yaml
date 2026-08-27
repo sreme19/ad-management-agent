@@ -54,10 +54,26 @@ meta:
   app_id: ""
   app_secret: ""
 
-  # A SYSTEM-USER token, not a user token. Generated in Business settings >
-  # System users > riteangle-api > Generate token, with scopes ads_management,
-  # ads_read, business_management, pages_show_list, pages_read_engagement,
-  # pages_manage_ads.
+  # A SYSTEM-USER token, not a user token. Business settings > System users >
+  # riteangle-api > Generate token, with scopes ads_management, ads_read,
+  # business_management, pages_show_list, pages_read_engagement, pages_manage_ads.
+  #
+  # SET EXPIRY TO **NEVER**, not the 60-day default the wizard preselects. A
+  # 60-day token reintroduces exactly the silent mid-campaign expiry this route
+  # was chosen to avoid, and Meta has no refresh-token equivalent to recover with.
+  #
+  # Two things about the wizard that are not where you would look for them
+  # (both learned the hard way on 2026-08-27):
+  #  - The app ROLE is granted via Assign assets > Apps > riteangle > Develop app,
+  #    NOT from the Installed apps tab, which has no Add button. Without a role the
+  #    wizard says "No permissions available" and Generate is disabled.
+  #  - The app is installed BY generating the token ("By clicking Generate Token,
+  #    you agree to install the selected app for system user ..."), so installing
+  #    first is impossible, not merely unnecessary.
+  #
+  # Page assets need only the Ads and Insights tasks. Do NOT grant Full access:
+  # its own description includes deleting the Page, which would make meta.py's
+  # refusal of DELETED/ARCHIVED cosmetic.
   #
   # It does NOT expire, which is why this shape was chosen: a long-lived user
   # token lasts ~60 days and Meta has no refresh-token equivalent, so it would

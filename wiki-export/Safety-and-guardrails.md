@@ -37,8 +37,12 @@ The boundary moved, but it did not blur. What stands:
   `PAUSED` and diffs back; `MetaClient._call` refuses any enabling status, any budget key on an update,
   and &mdash; with no Snap counterpart &mdash; any `DELETED`/`ARCHIVED`, since `ad-audit` must be able to
   read a pushed ad set months later and archived objects drop out of Meta's default listings. Note also:
-  Meta's **ads MCP server** channel must stay disabled for any ad account this repo drives directly, so
-  there is only ever one guarded write path. Research
+  Meta's **ads MCP server** channel must be *actively verified* disabled for any ad account this
+  repo drives — it is not off by default. On 2026-08-27, claiming the ad account into the portfolio left
+  it at **7 of 7** (create campaigns/ad sets/ads, edit budget, all Allowed) with nobody having enabled
+  it, and the setup note in force at the time said only to "leave it off", so nothing prompted a look.
+  Read the actual number after any claim: a parallel channel that can enable and re-budget the same
+  objects makes `MetaClient._call`'s refusals cosmetic. Research
   (`ad-ideation`, `ad-intake`) works from public sources &mdash; the Meta Ads Library, Snap's public ad
   search, Google's Ads Transparency Center &mdash; and from `pocket-dating-coach`'s own exports.
 - **Never change the budget of anything already live**, on either network.

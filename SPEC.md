@@ -191,9 +191,18 @@ they are load-bearing: the iOS build was actually rejected under App Store Guide
 - **Never add an enable, resume or activate call to a network client**, on either network, without the
   app owner saying so in as many words. Pausing is permitted (it can only stop spend); the asymmetry is
   deliberate — see `snap.py.pause_campaign`.
-- Never leave Meta's **ads MCP server** channel enabled for an ad account this repo drives directly
-  (Business settings → ads MCP server → "Actions allowed"). Two independent write paths into one live
-  ad account, one of them outside this repo's guards, is the failure decision #3 exists to prevent.
+- **Actively verify** that Meta's **ads MCP server** channel is disabled for any ad account this repo
+  drives (Business settings → ads MCP server → "Actions allowed"). Two independent write paths into one
+  live ad account, one of them outside this repo's guards, is the failure decision #3 exists to prevent.
+
+  **This is a check to run, not a default to assume, and that correction was paid for.** On 2026-08-27
+  the setup instructions said to "leave it off" — which meant nobody looked. Immediately after ad
+  account `1561367575690055` was claimed into the portfolio, the channel read **7 of 7**: take actions,
+  edit/set budget, create campaigns, create ad sets, create ads, all Allowed. Nobody enabled it;
+  claiming an account appears to enable it. It was caught only because the operator checked anyway. So:
+  after any claim, and periodically, read the actual number. `MetaClient._call`'s refusals are worth
+  nothing if a parallel channel can enable and re-budget the same objects. See
+  `lrn-2026-08-27-meta-mcp-defaults-on-after-claim`.
 - Never give this agent read access to member-data tables (decision #7's PII boundary).
 
 ## Architecture
