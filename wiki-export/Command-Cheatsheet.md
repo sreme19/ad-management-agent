@@ -5,10 +5,9 @@ Most `ad-agent` commands read and write the real ledger, or make one plain HTTP 
 creates them `PAUSED` and can never enable them or change the budget of anything already live, but it
 is a live-account write and it is called out below rather than buried.
 
-Meta creation was permitted on 2026-08-27 (decisions #3 and #10, extended to Meta), but **no Meta
-client exists yet** &mdash; no `meta.py`, no credential, and the registry still says
-`meta.creation: none`. So Meta setup still happens by hand, in the Ads Manager UI, following what a
-skill hands you. There is no `meta-push` command to reach for. See
+Meta creation was permitted on 2026-08-27 (decisions #3 and #10, extended to Meta) and `meta-push`
+now exists on the same paused-only terms as `snap-push`. Both are live-account writes and both are
+called out below rather than buried. Neither can enable anything. See
 [Safety and guardrails](Safety-and-guardrails) and `SPEC.md` decisions #3 and #10.
 
 ## Start here when you come back to this repo
@@ -38,6 +37,7 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 |---|---|
 | `propose` | Record a mode-5 recommendation before you execute it |
 | `snap-push` | Create a proposed recommendation in Snap Ads Manager, PAUSED, then diff it back |
+| `meta-push` | Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back |
 | `amend` | Revise a still-proposed recommendation, with an audit trail of what changed |
 | `log-setup` | Record the real IDs after setting the ad up by hand |
 | `note` | Append a dated note to a record — for things that change mid-run |
@@ -68,6 +68,12 @@ ad-agent propose [-h] --network NETWORK --campaign-name CAMPAIGN_NAME --ad-set-n
 
 ```
 ad-agent snap-push [-h] [--headline HEADLINE] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
+#### `meta-push`
+
+```
+ad-agent meta-push [-h] [--headline HEADLINE] [--message MESSAGE] [--cta CTA] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
 #### `amend`
@@ -342,7 +348,7 @@ hold with no unblock condition is indistinguishable from a no, and it will sit i
 When an idea becomes real, `ad-agent propose --from-idea <idea-id>` closes it out, so an approved idea
 that got acted on stops showing as one nobody touched.
 
-## "Create it on Snap for me" (the only live-account write)
+## "Create it on Snap for me" (one of two live-account writes)
 
 ```
 ad-agent snap-push <rec_id> [--headline "..."] [--dry-run] [--accept-campaign-cap]
@@ -381,6 +387,58 @@ real ad id is a known fact, so there is no macro left to silently fail the way o
 
 When it finishes, it prints the `log-setup` command with the real ids already filled in. Run that once
 you've enabled the ad &mdash; the loop is not closed until you do.
+
+## "Create it on Meta for me" (the other live-account write)
+
+```
+ad-agent meta-push <rec_id> [--headline "..."] [--message "..."] [--cta LEARN_MORE] [--dry-run] [--accept-campaign-cap]
+```
+
+The sibling of `snap-push`, added 2026-08-27 when the app owner extended `SPEC.md` decisions #3 and #10
+to Meta. Creates the campaign (or reuses one with an exactly matching name), ad set, image, creative and
+ad from a `proposed` record &mdash; **everything `PAUSED`** &mdash; then reads each object back and diffs
+it against the plan. Start with `--dry-run`.
+
+**It cannot enable anything, cannot change the budget of anything already live, and cannot delete or
+archive anything.** There is no enable/resume/activate call in `meta.py`, and a test asserts the class
+never grows one.
+
+It makes every refusal `snap-push` makes &mdash; no structured `targeting`, no QA `pass`, a blocked
+destination, a starving parent cap. **Three things are Meta-specific and worth knowing before you run
+it:**
+
+- **A campaign-budget-optimisation parent is refused outright, with no escape hatch.** This is worse
+  than the cap problem. A capped campaign *reduces* the ad set's spend, which is at least proportional
+  and visible. A CBO campaign **ignores the ad-set budget entirely** and distributes its own, so the
+  record's `budget_cap_inr_per_day` &mdash; the number `rules/budget.md`'s floor was checked against
+  &mdash; stops describing what gets spent. `--accept-campaign-cap` deliberately does *not* cover this:
+  a low cap can be a choice, but a CBO parent means the record cannot mean what it says.
+- **A pixel is mandatory, and more so than on Snap.** Snap counts landing-page views natively by
+  rendering the page in its own in-app browser, which is why a pixel-less Snap squad still reported 59
+  of them on 2026-08-26. Meta has no such fallback: no pixel means the optimisation has nothing to read.
+- **A non-INR ad account is refused.** Meta's budgets are in the account currency's minor unit &mdash;
+  paise, 100 to the rupee, *not* Snap's micro at 1,000,000. The client reads the account's own currency
+  and refuses rather than guessing an FX rate, because a wrong unit here is a 10,000× error in the
+  direction that spends money.
+
+Read the diff at the end rather than skimming it. **Meta rewrites targeting it considers suboptimal
+instead of rejecting it** &mdash; an ad set created with Advantage Audience off can come back on, with
+the POST still returning 200. On an age-banded women's test that silently answers a different question
+than the one the record was created to ask.
+
+Two more things `meta.py` does quietly that are worth knowing: Meta's "standard enhancements" are opted
+**out**, because `rules/creative-generation.md` §10's QA gate signs off on a specific asset and a
+post-gate recrop voids the sign-off; and the spec's `regulated_content` flag is **dropped, not mapped**,
+because Meta gates dating at the account level and has no field for it. The plan print says so out loud
+rather than leaving you to assume a declaration was made.
+
+Tracking works the same way as on Snap and lands in a different field: `utm_content` carries the ad id
+on Meta where `utm_id` does on Snap, and it is written to the ad's own `url_tags` &mdash; literally,
+after the real ad id exists, so there is no `{{ad.id}}` macro left to silently fail the way one did on
+2026-08-21.
+
+When it finishes it prints the `log-setup` command with the real ids filled in. Run that once you've
+enabled the ad &mdash; the loop is not closed until you do.
 
 ## "This proposal needs correcting before I run it"
 

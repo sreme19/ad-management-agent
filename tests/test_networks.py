@@ -24,13 +24,19 @@ class TestTheRealRegistry:
     def test_both_networks_are_registered(self):
         assert set(networks.names(RULES)) == {"snap", "meta"}
 
-    def test_snap_may_create_paused_and_meta_may_not_create_at_all(self):
+    def test_both_networks_may_create_paused_only(self):
+        # Meta flipped from `none` on 2026-08-27, in the same commit as meta-push.
+        # `paused-only` is the ONLY permitted non-`none` value: if a third mode ever
+        # appears here, it is a new capability and wants its own review.
         assert networks.get(RULES, "snap")["creation"] == "paused-only"
-        assert networks.get(RULES, "meta")["creation"] == "none"
+        assert networks.get(RULES, "meta")["creation"] == "paused-only"
+        assert set(networks.CREATION_MODES) == {"none", "paused-only"}
 
-    def test_meta_holds_no_credentials(self):
-        # SPEC.md decision #10, unamended for Meta.
-        assert networks.get(RULES, "meta")["credentials"] is False
+    def test_meta_now_points_at_its_credentials(self):
+        # SPEC.md decision #10, extended to Meta 2026-08-27. This asserts the
+        # registry POINTS somewhere, not that a credential exists — the pointer is
+        # documentation, and config.local.yaml is gitignored and may be empty.
+        assert networks.get(RULES, "meta")["credentials"] == "config.local.yaml -> meta.*"
 
     def test_the_networks_disagree_about_the_ad_join_and_that_is_recorded(self):
         # The thing a hardcoded literal kept getting wrong.
@@ -53,9 +59,24 @@ class TestTheRegistryCanOnlyRefuse:
     def test_require_creation_passes_for_snap(self):
         networks.require_creation(RULES, "snap", mode="paused-only")
 
-    def test_require_creation_refuses_meta(self):
+    def test_require_creation_passes_for_meta(self):
+        # Was test_require_creation_refuses_meta until 2026-08-27. Changed to assert
+        # the new direction rather than deleted, per SPEC.md's note on this flip: a
+        # deleted test is a check nobody notices going missing.
+        networks.require_creation(RULES, "meta", mode="paused-only")
+
+    def test_a_network_declared_none_is_still_refused(self, ledger_root):
+        # The field has to keep working as a refusal now that neither real network
+        # uses it, or the next network added inherits a guard nothing tests.
+        write_registry(ledger_root, {
+            "snap": {"label": "Snapchat", "utm_source": "snapchat", "ad_join_param": "utm_id",
+                     "ad_set_join_param": "utm_term", "creation": "paused-only"},
+            "truecaller": {"label": "Truecaller", "utm_source": "truecaller",
+                           "ad_join_param": "utm_id", "ad_set_join_param": "utm_term",
+                           "creation": "none"},
+        })
         with pytest.raises(networks.NetworkError):
-            networks.require_creation(RULES, "meta", mode="paused-only")
+            networks.require_creation(ledger_root / "rules", "truecaller", mode="paused-only")
 
     def test_tightening_snap_to_none_blocks_the_push(self, ledger_root):
         # Editing the registry can take a capability away...
@@ -66,11 +87,24 @@ class TestTheRegistryCanOnlyRefuse:
         run(propose_argv(ledger_root))
         assert run(["snap-push", f"rec-{cli._today()}-w2330", "--dry-run"]) == 2
 
-    def test_loosening_meta_grants_nothing(self, ledger_root):
-        # ...and cannot give one. snap-push checks the record's network itself,
-        # before it ever consults the registry, so declaring meta creatable here
-        # does not teach this command a second API — and there is no Meta client
-        # or credential for it to use even if it did.
+    def test_tightening_meta_to_none_blocks_its_push_too(self, ledger_root):
+        # The mirror of the snap case, and the reason the field still matters now
+        # that both real networks read paused-only: it can still take a capability
+        # away, per-network, without touching code.
+        write_registry(ledger_root, {
+            "snap": {"label": "Snapchat", "utm_source": "snapchat", "ad_join_param": "utm_id",
+                     "ad_set_join_param": "utm_term", "creation": "paused-only"},
+            "meta": {"label": "Meta", "utm_source": "meta", "ad_join_param": "utm_content",
+                     "ad_set_join_param": "utm_term", "creation": "none"},
+        })
+        run(propose_argv(ledger_root, network="meta"))
+        assert run(["meta-push", f"rec-{cli._today()}-w2330", "--dry-run"]) == 2
+
+    def test_loosening_meta_grants_snap_push_nothing(self, ledger_root):
+        # ...and cannot give one. snap-push checks the record's OWN network before it
+        # ever consults the registry, so declaring meta creatable here does not teach
+        # that command a second API. Still true now that a Meta client exists — the
+        # two pushes are separate commands, not one command reading a flag.
         write_registry(ledger_root, {
             "snap": {"label": "Snapchat", "utm_source": "snapchat", "ad_join_param": "utm_id",
                      "ad_set_join_param": "utm_term", "creation": "paused-only",

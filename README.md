@@ -30,11 +30,16 @@ Amended by the app owner on 2026-08-26, after the trade-off was put to them. Bot
   API to diff it against the plan before it exits. There is no enable, resume or activate call
   anywhere in `snap.py`, and none is to be added without the app owner saying so in as many words.
   **Starting spend is a human action in Ads Manager, every time.**
-- **Meta: permitted since 2026-08-27, but not built yet.** The app owner extended decision #3 to Meta
-  on the same paused-only terms as Snap, so a Meta client *may* be written. None exists today: there is
-  no `meta.py`, no Meta credential in `config.local.yaml`, and `rules/networks.yaml` still declares
-  `meta.creation: none`. Until that lands, `ad-setup-loop` output for Meta is still instructions a
-  human executes by hand. Permission is not capability — don't read this bullet as a push path.
+- **Meta: creation is allowed, enabling is not — same terms as Snap, since 2026-08-27.**
+  `ad-agent meta-push` creates campaigns, ad sets, creatives and ads `PAUSED` and diffs each back.
+  There is no enable/resume/activate call in `meta.py`, and it additionally cannot delete or archive
+  anything, because `ad-audit` has to be able to read a pushed ad set months later. Three Meta-only
+  guards: budgets are paise (100/rupee) not Snap's micro, so a non-INR account is refused rather than
+  FX-guessed; an update is a `POST` to a bare object id rather than a `PUT`, so the budget guard keys
+  off the path and not the method; and a campaign-budget-optimisation parent is refused outright,
+  because it ignores the ad-set budget rather than capping it.
+  **A credential still has to exist for any of this to run** — `config.local.yaml`'s `meta:` block is
+  the gate, and `MetaClient` refuses construction without it.
 - **Never change the budget of anything already live**, on either network.
 
 Be clear about what this cost. The old rule ("never touches a live account") was true *by
@@ -124,6 +129,7 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 |---|---|
 | `propose` | Record a mode-5 recommendation before you execute it |
 | `snap-push` | Create a proposed recommendation in Snap Ads Manager, PAUSED, then diff it back |
+| `meta-push` | Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back |
 | `amend` | Revise a still-proposed recommendation, with an audit trail of what changed |
 | `log-setup` | Record the real IDs after setting the ad up by hand |
 | `note` | Append a dated note to a record — for things that change mid-run |
@@ -154,6 +160,12 @@ ad-agent propose [-h] --network NETWORK --campaign-name CAMPAIGN_NAME --ad-set-n
 
 ```
 ad-agent snap-push [-h] [--headline HEADLINE] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
+#### `meta-push`
+
+```
+ad-agent meta-push [-h] [--headline HEADLINE] [--message MESSAGE] [--cta CTA] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
 #### `amend`

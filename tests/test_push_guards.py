@@ -6,6 +6,7 @@ client asserts that a refused request never gets as far as urlopen.
 """
 from __future__ import annotations
 
+import pytest
 import yaml
 from conftest import propose_argv, run
 
@@ -116,3 +117,54 @@ def run_gate(caps, daily, days, accept):
     except SystemExit as exc:
         return exc.code or 0
     return 0
+
+
+class TestMetaPushRefusesBeforeCreating:
+    """The same guard set as snap-push, plus the ones only Meta needs.
+
+    None of these reach the network: each fires while the client is still None.
+    """
+
+    def test_a_snap_record_is_refused_by_meta_push(self, ledger_root):
+        # The mirror of snap-push's own network check. Each push knows one API, and
+        # the registry cannot teach either of them a second one.
+        run(propose_argv(ledger_root, network="snap"))
+        assert run(["meta-push", rec_id_of(ledger_root), "--dry-run"]) == 2
+
+    def test_a_record_with_no_targeting_block(self, ledger_root):
+        run(propose_argv(ledger_root, network="meta"))
+        strip_field(ledger_root, "targeting")
+        assert run(["meta-push", rec_id_of(ledger_root), "--dry-run"]) == 2
+
+    def test_a_creative_with_no_recorded_qa_pass(self, ledger_root):
+        run(propose_argv(ledger_root, network="meta"))
+        (ledger_root / "creatives" / "test-asset" / "qa.md").write_text("Verdict: `regenerate`\n")
+        assert run(["meta-push", rec_id_of(ledger_root), "--dry-run"]) == 2
+
+
+class TestMetaPushDryRunHappyPath:
+    def test_it_prints_the_plan_and_creates_nothing(self, ledger_root, capsys):
+        run(propose_argv(ledger_root, network="meta"))
+        assert run(["meta-push", rec_id_of(ledger_root), "--dry-run"]) == 0
+        out = capsys.readouterr().out
+
+        # The plan the operator reads before anything is created.
+        assert "everything created PAUSED" in out
+        assert "LANDING_PAGE_VIEWS" in out
+        assert "--dry-run: nothing created." in out
+
+        # With no credentials configured, the missing parent-budget check has to be
+        # stated rather than passed over in silence — it is the one thing that can
+        # invalidate the test the record exists to run.
+        assert "budget state was NOT" in out
+
+        # The dropped spec field is said out loud. A silent drop is how a reader
+        # comes to believe a declaration was made that was not.
+        assert "regulated_content has no Meta equivalent" in out
+
+    def test_the_dry_run_never_touches_the_network(self, ledger_root, monkeypatch):
+        import urllib.request
+        monkeypatch.setattr(urllib.request, "urlopen",
+                            lambda *a, **k: pytest.fail("a dry run reached the network"))
+        run(propose_argv(ledger_root, network="meta"))
+        assert run(["meta-push", rec_id_of(ledger_root), "--dry-run"]) == 0

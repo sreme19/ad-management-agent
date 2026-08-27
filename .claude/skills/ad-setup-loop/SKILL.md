@@ -7,8 +7,9 @@ description: Recommend a new ad — campaign/ad-set/ad names, targeting, and cre
 
 ## What this skill never does
 
-This skill produces instructions a human executes by hand in Ads Manager. It never calls a Meta or
-Snap Ads Manager API to create, publish, enable, or change budget on anything live — that boundary is
+This skill may create on Snap (`snap-push`, since 2026-08-26) and on Meta (`meta-push`, since
+2026-08-27), and only ever `PAUSED`. It never enables, publishes, or changes the budget of anything
+live, on either network — that boundary is
 locked in `SPEC.md` and does not get relaxed later, even once a Claude plugin exists to "steer"
 implementation. The plugin's job, if it ever exists, is telling the human what to click — never
 clicking it.
@@ -119,14 +120,24 @@ depend on that file being current.
    click. `--accept-campaign-cap` proceeds anyway as a stated deviation, and prints the `note` command
    to record it.
 
-   **On Meta, hand it back &mdash; for now.** Decision #10 was extended to Meta on 2026-08-27, so a client
-   is permitted, but none is written: there is no `meta.py`, no credential on disk, and
-   `rules/networks.yaml` says `meta.creation: none`. So there is nothing to call, and this stays a
-   hand-back until that changes. Do not attempt a Meta API call on the strength of the amendment.
-   Tell the user exactly what to name each level and what to paste into targeting/budget fields — a
-   checklist they can follow without re-deriving anything. Include the full UTM string verbatim as one
-   of the fields to paste; note that Meta reads `utm_content` as the ad-level id where Snap reads
-   `utm_id` (`rules/networks.yaml`), so don't cross the two conventions.
+   **On Meta, use `ad-agent meta-push <rec_id> --dry-run` first, then the real run.** Same shape as
+   `snap-push` and the same gates. Three Meta-specific things to surface to the user rather than
+   discover mid-run: a **pixel is mandatory** (Meta has no native landing-page-view fallback the way
+   Snap's in-app browser does); the ad account must settle in **INR** or the client refuses, because
+   Meta budgets are paise and Snap's are micro; and a **campaign-budget-optimisation parent is refused
+   outright with no escape hatch**, because it ignores the ad-set budget rather than capping it, which
+   makes the record's stated budget meaningless.
+
+   Read the read-back diff rather than skimming it: **Meta rewrites targeting it considers suboptimal
+   instead of rejecting it**, so an ad set created with Advantage Audience off can come back on with
+   the POST still returning 200. On an age-banded women's test that silently answers a different
+   question than the record was created to ask — treat it as a decision for the user, not a shrug.
+
+   If there is no `meta:` block in `config.local.yaml` yet, this stays a hand-back: tell the user
+   exactly what to name each level and what to paste into targeting/budget fields — a checklist they
+   can follow without re-deriving anything. Include the full UTM string verbatim; note that Meta reads
+   `utm_content` as the ad-level id where Snap reads `utm_id` (`rules/networks.yaml`), so don't cross
+   the two conventions.
 9. **Pre-launch tracking check — before the ad goes live, every time.** Per `rules/tracking.md`: open
    the ad's actual Website URL field and confirm every macro (`utm_term`, `utm_id`, `utm_content`) is
    present and set at the ad level, then click the ad's own preview/swipe-up link and confirm the

@@ -33,12 +33,12 @@ The boundary moved, but it did not blur. What stands:
   and ads &mdash; **always with status `PAUSED`** &mdash; and reads every object back from the API to
   diff it against the plan before it exits, because a 200 from a POST is not evidence that an ad squad
   targets who you think it targets. Starting spend is a human action in Ads Manager, every time.
-- **Meta: permitted 2026-08-27, not yet built.** Decision #3 was extended to Meta on the same
-  paused-only terms, and decision #10 now allows a Meta system-user token in `config.local.yaml`. As of
-  this page there is still no Meta client and no Meta credential, and the registry declares
-  `meta.creation: none` &mdash; that flip is meant to land in the same commit as the client and its
-  safety tests, never ahead of them. Note also: Meta's **ads MCP server** channel must stay disabled for
-  any ad account this repo drives directly, so there is only ever one guarded write path. Research
+- **Meta: creation allowed since 2026-08-27, on the same paused-only terms.** `meta-push` creates
+  `PAUSED` and diffs back; `MetaClient._call` refuses any enabling status, any budget key on an update,
+  and &mdash; with no Snap counterpart &mdash; any `DELETED`/`ARCHIVED`, since `ad-audit` must be able to
+  read a pushed ad set months later and archived objects drop out of Meta's default listings. Note also:
+  Meta's **ads MCP server** channel must stay disabled for any ad account this repo drives directly, so
+  there is only ever one guarded write path. Research
   (`ad-ideation`, `ad-intake`) works from public sources &mdash; the Meta Ads Library, Snap's public ad
   search, Google's Ads Transparency Center &mdash; and from `pocket-dating-coach`'s own exports.
 - **Never change the budget of anything already live**, on either network.

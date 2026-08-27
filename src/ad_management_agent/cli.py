@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import budget as budgetrules
 from . import destinations
+from . import meta as metaapi
 from . import networks as networkreg
 from . import research as researchmod
 from . import snap as snapapi
@@ -64,7 +65,7 @@ def _add_targeting_flags(sp: argparse.ArgumentParser, *, required: bool) -> None
     YAML through argv.
     """
     g = sp.add_argument_group(
-        "targeting (structured — this is what snap-push actually pushes)"
+        "targeting (structured — this is what snap-push and meta-push actually push)"
     )
     g.add_argument("--gender", required=required, default=None,
                    choices=list(targetingspec.GENDERS),
@@ -311,13 +312,16 @@ def _gate_campaign_caps(caps: dict, *, squad_daily_inr: float, duration_days: in
     print("\n--accept-campaign-cap: proceeding with the cap above as a stated deviation.")
 
 
-def _utm_url(rules_dir: Path, network: str, destination: str, campaign_name: str,
-             ad_squad_id: str, ad_id: str, ad_name: str) -> str:
-    """rules/tracking.md's scheme, with every value literal.
+def _utm_query(rules_dir: Path, network: str, campaign_name: str,
+               ad_squad_id: str, ad_id: str, ad_name: str) -> str:
+    """rules/tracking.md's five parameters as a bare query string, no leading `?`.
 
-    Ads Manager fills these from {{macros}}; the 2026-08-21 incident was a macro
-    that silently never resolved. Pushed through the API the ids are known facts by
-    the time the URL is written, so there is no macro left to fail.
+    Split out from `_utm_url` because the two networks want it at different points
+    in the URL. Snap takes a complete Website URL on the creative, so the params
+    are appended there. Meta takes them in the ad's own `url_tags` field, which is
+    query-string syntax WITHOUT a base URL or a `?` — passing a full URL there
+    produces a link with the destination embedded in its own query string, which
+    fails silently by still being a valid URL.
 
     The parameter names come from rules/networks.yaml rather than from literals
     here, because Snap and Meta genuinely disagree about which one carries the ad
@@ -325,10 +329,22 @@ def _utm_url(rules_dir: Path, network: str, destination: str, campaign_name: str
     one.
     """
     from urllib.parse import urlencode
-    return destination + "?" + urlencode(
+    return urlencode(
         networkreg.utm_params(rules_dir, network, campaign_name=campaign_name,
                               ad_set_id=ad_squad_id, ad_id=ad_id, ad_name=ad_name)
     )
+
+
+def _utm_url(rules_dir: Path, network: str, destination: str, campaign_name: str,
+             ad_squad_id: str, ad_id: str, ad_name: str) -> str:
+    """The destination with rules/tracking.md's scheme appended, every value literal.
+
+    Ads Manager fills these from {{macros}}; the 2026-08-21 incident was a macro
+    that silently never resolved. Pushed through the API the ids are known facts by
+    the time the URL is written, so there is no macro left to fail.
+    """
+    return destination + "?" + _utm_query(
+        rules_dir, network, campaign_name, ad_squad_id, ad_id, ad_name)
 
 
 def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
@@ -512,6 +528,248 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
           f"  ad-agent log-setup {args.rec_id} --network snap \\\n"
           f"    --campaign-id {campaign['id']} \\\n"
           f"    --ad-set-id {squad['id']} \\\n"
+          f"    --ad-id {ad['id']}")
+
+
+def _gate_campaign_budget_optimization(caps: dict, *, rec_id: str) -> None:
+    """Refuse to hang an ad set off a Meta campaign that holds the budget itself.
+
+    This has no Snap equivalent and it is strictly worse than the cap problem that
+    `_gate_campaign_caps` exists for. A capped campaign *reduces* the ad set's spend,
+    which is at least proportional and visible in the numbers. A campaign using
+    campaign-budget optimisation **ignores the ad-set budget outright** and
+    distributes its own across children as it sees fit — so the `budget_cap_inr_per_day`
+    the ledger record states, and that `rules/budget.md`'s floor was checked against,
+    becomes a number with no relationship to what gets spent.
+
+    There is no escape hatch, unlike the cap gate. `--accept-campaign-cap` exists
+    because a low cap is sometimes deliberate; a CBO parent is not a deviation to
+    accept, it is a statement that this record cannot mean what it says. Move the ad
+    set to a non-CBO campaign, or turn CBO off in Ads Manager.
+    """
+    if not caps.get("campaign_budget_optimization"):
+        return
+    print(
+        f"error: the parent campaign uses campaign-budget optimisation, so it holds the\n"
+        f"       budget and this ad set's Rs/day would be IGNORED rather than capped.\n"
+        f"       (campaign daily={caps.get('daily_inr')}, lifetime={caps.get('lifetime_inr')})\n\n"
+        f"       {rec_id} states a budget cap that would not describe what gets spent, and\n"
+        f"       rules/budget.md's floor was checked against that same number. Turn CBO off\n"
+        f"       in Ads Manager, or point this record at a non-CBO campaign.\n\n"
+        f"       There is deliberately no --accept flag for this: a low cap can be a\n"
+        f"       choice, but a CBO parent means the record cannot mean what it says.",
+        file=sys.stderr)
+    raise SystemExit(2)
+
+
+def cmd_meta_push(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Create a proposed record on Meta, PAUSED, and diff it back.
+
+    The sibling of `cmd_snap_push`, and deliberately the same shape: same record
+    gates, same destination gate, same QA-pass requirement, same parent-cap check,
+    same read-back-and-diff. Where it differs, it differs because Meta does.
+    """
+    config = load_config()
+    rec = ledger.find(args.rec_id)
+    fm = rec.front_matter
+
+    # Two checks, deliberately — the same pair snap-push makes. This command only
+    # knows how to talk to Meta, and separately the registry has to declare that
+    # creating on it is permitted at all. The registry can only tighten this;
+    # editing it cannot teach this function a second API.
+    if fm.get("network") != "meta":
+        print(f"error: {args.rec_id} is network={fm.get('network')!r}, not meta", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        networkreg.require_creation(ledger.root / "rules", "meta", mode="paused-only")
+    except networkreg.NetworkError as exc:
+        _fail(exc)
+    if fm.get("status") != "proposed":
+        print(f"error: {args.rec_id} is {fm.get('status')!r}; push expects 'proposed'.\n"
+              "A record that is already live has real ids — pushing again would create "
+              "duplicates.", file=sys.stderr)
+        raise SystemExit(2)
+
+    # The destination gate applies here too: this is the moment the ad set is
+    # actually pointed at a page, so it is the last useful place to catch a mismatch.
+    try:
+        destinations.check(ad_set_name=fm["ad_set_name"],
+                           destination_url=fm["destination_url"],
+                           rules_dir=ledger.root / "rules")
+    except destinations.DestinationGateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    asset = ledger.root / fm["creative_ref"] / "asset-a.jpg"
+    qa = ledger.root / fm["creative_ref"] / "qa.md"
+    if not asset.exists():
+        print(f"error: creative not found at {asset}", file=sys.stderr)
+        raise SystemExit(2)
+    if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
+        print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+    start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
+    end = start + _dt.timedelta(days=int(fm["duration_days"]))
+    def iso(d):
+        # Meta wants ISO 8601 with an offset, where Snap wants a milliseconds-and-Z
+        # format. Same instant, different spelling; neither accepts the other's.
+        return d.strftime("%Y-%m-%dT%H:%M:%S+0000")
+
+    budget = float(fm["budget_cap_inr_per_day"])
+
+    spec = fm.get("targeting")
+    if not spec:
+        print(f"error: {args.rec_id} has no structured `targeting` block, so there is nothing\n"
+              "safe to push. Add it:\n"
+              f"  ad-agent amend {args.rec_id} --reason 'add structured targeting' \\\n"
+              "    --gender FEMALE --min-age 25 --max-age 30 --countries in",
+              file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        targetingspec.validate(spec)
+        targetingspec.check_matches_ad_set_name(spec, fm["ad_set_name"])
+    except targetingspec.TargetingError as exc:
+        _fail(exc)
+    targeting = targetingspec.to_meta(spec)
+
+    plan = [
+        ("campaign   ", f'{fm["campaign_name"]}  OUTCOME_TRAFFIC'),
+        ("ad set     ", (f'{fm["ad_set_name"]}  Rs {budget:.0f}/day x '
+                         f'{fm["duration_days"]}d, LANDING_PAGE_VIEWS, lowest cost')),
+        ("ad         ", fm["ad_name"]),
+        ("creative   ", f'{asset.name}  headline={args.headline!r}  CTA={args.cta}'),
+        ("destination", fm["destination_url"]),
+        ("targeting  ", targetingspec.describe(spec)),
+    ]
+    print(f"Plan for {args.rec_id} (everything created PAUSED):")
+    for k, v in plan:
+        print(f"  {k}  {v}")
+    # Said out loud in the plan, because it is the one field of the spec that does
+    # not survive the crossing and a silent drop is how a reader comes to believe a
+    # declaration was made that was not.
+    if spec.get("regulated_content", True):
+        print("  note         regulated_content has no Meta equivalent and is NOT sent; "
+              "Meta gates dating at the account level instead")
+
+    # A dry run still reads the parent campaign's budget state. That check is the
+    # whole reason to dry-run — it is the one thing that can silently invalidate the
+    # test — so returning before it would leave the rehearsal unable to rehearse the
+    # only failure it exists to catch. Everything behind it is a read-only GET.
+    client = None
+    try:
+        client = metaapi.MetaClient(config.get("meta") or {})
+    except metaapi.MetaError as exc:
+        if not args.dry_run:
+            _fail(exc)
+        print(f"\nnote: no Meta credentials, so the parent campaign's budget state was NOT\n"
+              f"      checked — the one thing most likely to make this ad set unreadable.\n"
+              f"      ({exc})")
+
+    campaign = None
+    if client is not None:
+        # Before anything else: the currency, because every rupee figure below is
+        # converted to paise on the way out and a non-INR account makes that wrong.
+        client.require_inr()
+        campaign = client.find_campaign(fm["campaign_name"])
+        if campaign:
+            print(f"\ncampaign  reusing {campaign['id']}")
+        elif args.dry_run:
+            print(f"\ncampaign  {fm['campaign_name']} does not exist yet; it would be created "
+                  "new, with no budget of its own to inherit")
+        else:
+            campaign = client.create_campaign(fm["campaign_name"])
+            print(f"\ncampaign  created {campaign['id']}")
+
+    # Checked before the ad set exists, not after: a parent that would starve or
+    # override this ad set is cheaper to fix while nothing hangs off it yet.
+    if campaign is not None:
+        caps = client.campaign_caps(campaign["id"])
+        _gate_campaign_budget_optimization(caps, rec_id=args.rec_id)
+        _gate_campaign_caps(caps, squad_daily_inr=budget, duration_days=int(fm["duration_days"]),
+                            rec_id=args.rec_id, accept=args.accept_campaign_cap)
+        if not args.dry_run:
+            ledger.record_campaign_caps(args.rec_id, daily_inr=caps.get("daily_inr"),
+                                        lifetime_inr=caps.get("lifetime_inr"), today=_today())
+
+    if args.dry_run:
+        print("\n--dry-run: nothing created.")
+        return
+
+    adset = client.create_adset(name=fm["ad_set_name"], campaign_id=campaign["id"],
+                                targeting=targeting, daily_budget_inr=budget,
+                                start_time=iso(start), end_time=iso(end),
+                                pixel_id=(config.get("meta") or {}).get("pixel_id"))
+    print(f"ad set    created {adset['id']}")
+
+    image_hash = client.upload_image(asset)
+    print(f"image     uploaded hash={image_hash}")
+
+    # The creative's link carries the destination and the params that are known now.
+    # utm_content has to carry the AD id on Meta (per traffic-quality.ts) and the ad
+    # does not exist yet, so the id goes on afterwards via the ad's url_tags.
+    creative = client.create_creative(
+        name=f'{fm["ad_name"]}_CREATIVE', image_hash=image_hash,
+        headline=args.headline, message=args.message,
+        url=fm["destination_url"], call_to_action=args.cta)
+    print(f"creative  created {creative['id']}")
+
+    ad = client.create_ad(name=fm["ad_name"], adset_id=adset["id"],
+                          creative_id=creative["id"])
+    print(f"ad        created {ad['id']}")
+
+    url_tags = _utm_query(ledger.root / "rules", "meta", fm["campaign_name"],
+                          adset["id"], ad["id"], fm["ad_name"])
+    client.set_ad_url_tags(ad["id"], url_tags)
+    print("ad        url_tags written with the real ad id (no {{macro}} to not resolve)")
+
+    # ---- read back, and diff against what was asked for ----
+    print("\nRead-back:")
+    adset_live = client.get(
+        f"/{adset['id']}",
+        fields="id,name,status,daily_budget,optimization_goal,billing_event,targeting")
+    ad_live = client.get(f"/{ad['id']}", fields="id,name,status,url_tags,creative")
+    creative_live = client.get(f"/{creative['id']}", fields="id,name,object_story_spec")
+    link_data = ((creative_live.get("object_story_spec") or {}).get("link_data") or {})
+
+    checks = [
+        ("ad set status", adset_live.get("status"), "PAUSED"),
+        ("ad status", ad_live.get("status"), "PAUSED"),
+        # Compared in paise, in the unit Meta actually stores, so a minor-unit
+        # mistake shows up here as a diff rather than as a plausible-looking number.
+        ("daily budget (paise)", adset_live.get("daily_budget"),
+         round(budget * metaapi.MINOR)),
+        ("optimisation goal", adset_live.get("optimization_goal"), "LANDING_PAGE_VIEWS"),
+        # Derived from the record's own spec, never from a literal — a read-back
+        # compared against a hardcoded dict only ever validates the code against
+        # itself, which is how a wrong audience would pass silently.
+        *targetingspec.meta_readback_checks(spec, adset_live),
+        ("headline", link_data.get("name"), args.headline),
+        ("landing url", link_data.get("link"), fm["destination_url"]),
+        ("url_tags", ad_live.get("url_tags"), url_tags),
+    ]
+    bad = 0
+    for label, got, want in checks:
+        ok = str(got) == str(want)
+        bad += not ok
+        print(f"  {'ok ' if ok else 'DIFF'}  {label:22} {got}")
+        if not ok:
+            print(f"        {'':22} expected: {want}")
+
+    print()
+    if bad:
+        print(f"{bad} field(s) differ from the plan. Fix in Ads Manager before enabling.")
+        print("Meta rewrites targeting it considers suboptimal rather than rejecting it, so a\n"
+              "diff on an audience field is a real change to what this test measures — not\n"
+              "noise. Advantage Audience is the usual culprit.")
+    else:
+        print("Every field matches the plan.")
+    print("Nothing is live: all objects are PAUSED. Enabling is a human action in Ads Manager.")
+    print(f"\nWhen you have enabled it, close the loop:\n"
+          f"  ad-agent log-setup {args.rec_id} --network meta \\\n"
+          f"    --campaign-id {campaign['id']} \\\n"
+          f"    --ad-set-id {adset['id']} \\\n"
           f"    --ad-id {ad['id']}")
 
 
@@ -1229,6 +1487,25 @@ def build_parser() -> argparse.ArgumentParser:
                     help="create anyway when the parent campaign's cap would bind, as a "
                          "stated deviation rather than a surprise")
     sp.set_defaults(func=cmd_snap_push)
+
+    sp = sub.add_parser(
+        "meta-push",
+        help="Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back",
+    )
+    sp.add_argument("rec_id")
+    sp.add_argument("--headline", default="A shortlist that means something.",
+                    help="the link headline (Meta's `name` field), ~40 chars before truncation")
+    sp.add_argument("--message", default="",
+                    help="primary text above the image; required by Meta for a link ad")
+    sp.add_argument("--cta", default="LEARN_MORE",
+                    help="call-to-action button type, e.g. LEARN_MORE, SIGN_UP, DOWNLOAD")
+    sp.add_argument("--dry-run", action="store_true",
+                    help="print the plan and create nothing")
+    sp.add_argument("--accept-campaign-cap", action="store_true",
+                    help="create anyway when the parent campaign's cap would bind, as a "
+                         "stated deviation rather than a surprise. Does NOT apply to a "
+                         "campaign-budget-optimisation parent, which is refused outright")
+    sp.set_defaults(func=cmd_meta_push)
 
     sp = sub.add_parser(
         "amend",

@@ -220,10 +220,12 @@ in ways that have caused real bugs:
 
 **The `creation` field can only ever refuse**, and that distinction is the whole reason it is allowed
 to live in an editable text file. The code consults it *in addition to* its own checks, never instead
-of them. Setting `meta: creation: paused-only` grants nothing — `snap-push` refuses a non-Snap record
-before it ever reads the registry, there is no Meta client to call, and no Meta credential exists to
-call it with. What actually holds the paused-only line is the absence of credentials and the
-transport-layer refusal in `snap.py`. See [Why it's built this way](Safety-and-guardrails).
+of them. Setting a network to `paused-only` grants nothing on its own — `snap-push` refuses a non-Snap
+record and `meta-push` a non-Meta one before either reads the registry, so the field cannot teach a
+command an API it does not have. What actually holds the paused-only line is the transport-layer
+refusal in each client (`SnapClient._call`, `MetaClient._call`). Both networks read `paused-only` as of
+2026-08-27; the field's remaining job is to *take a capability away* per-network without touching code,
+and to refuse a third network until it has a client. See [Why it's built this way](Safety-and-guardrails).
 
 The file leads with the argument against using it. `rules/budget.md` puts minimum viable spend at
 &#8377;800&ndash;1,200/day per ad set against a &#8377;50,000/month envelope &mdash; one or two properly

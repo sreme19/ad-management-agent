@@ -39,10 +39,14 @@
 # creation         what this agent may create: `none` or `paused-only`.
 #                  This field can only ever REFUSE. It is a declaration of intent
 #                  that the code consults in addition to its own hardcoded checks,
-#                  never instead of them — flipping meta to `paused-only` here
-#                  grants nothing, because there is no Meta client and no Meta
-#                  credential (SPEC.md decision #10). The real guarantees are the
-#                  absence of credentials and snap.py's transport-layer refusal.
+#                  never instead of them — editing it cannot teach a command a new
+#                  API. `snap-push` refuses a non-snap record and `meta-push` a
+#                  non-meta one before either consults this file, so setting a
+#                  network to `paused-only` here grants nothing on its own. The
+#                  real guarantees are the clients' transport-layer refusals
+#                  (SnapClient._call, MetaClient._call). Both networks read
+#                  `paused-only` as of 2026-08-27; adding a THIRD still requires a
+#                  client module, and this field would refuse it until one exists.
 # credentials      where this network's credentials live, or false if none exist.
 
 networks:
@@ -67,12 +71,21 @@ networks:
     utm_source: meta
     ad_join_param: utm_content
     ad_set_join_param: utm_term
-    creation: none
-    credentials: false
+    creation: paused-only
+    credentials: config.local.yaml -> meta.*
     note: >-
-      Entirely hands-off and unamended. No Ads Manager call, no Marketing API
-      credential in this repo. Setup is a human executing ad-setup-loop's output
-      by hand. Note the join difference: Meta reads utm_content as the ad-level id
-      where Snap reads utm_id, per traffic-quality.ts. utm_content carries a
-      human-readable ad name on Snap and is load-bearing on Meta, so a change to
-      what that parameter holds is safe on one network and breaking on the other.
+      Creation was permitted by the app owner on 2026-08-27 (SPEC.md decisions #3
+      and #10, extended to Meta) on the same paused-only terms as Snap: meta-push
+      creates campaigns, ad sets, creatives and ads with status PAUSED, reads each
+      back and diffs it against the plan. It cannot enable anything, change a live
+      budget, or delete/archive anything — refused in MetaClient._call rather than
+      by convention. Note the join difference: Meta reads utm_content as the
+      ad-level id where Snap reads utm_id, per traffic-quality.ts. utm_content
+      carries a human-readable ad name on Snap and is load-bearing on Meta, so a
+      change to what that parameter holds is safe on one network and breaking on
+      the other. Three Meta-only traps, all enforced in code: budgets are in paise
+      (100/rupee) not Snap's micro (1,000,000), so the client refuses a non-INR
+      account rather than guessing an FX rate; an update is a POST to a bare object
+      id rather than a PUT, so the budget guard keys off the path and not the
+      method; and a campaign using campaign-budget optimisation IGNORES the ad-set
+      budget rather than capping it, which meta-push refuses with no escape hatch.

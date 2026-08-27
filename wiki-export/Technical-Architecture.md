@@ -12,7 +12,7 @@ instead &mdash; this page assumes you're comfortable with terms like "CLI" and "
 | LLM | None, in this repo | Every mode is a Claude Code skill; the CLI never imports or calls an Anthropic client (`SPEC.md` decision #1) |
 | Ledger storage | Markdown files with YAML front matter, one per campaign, via **PyYAML** | Chosen over a spreadsheet (no pre-existing habit to extend, unlike job-hunt's Career Hacking Tracker) and over plain JSON (a human has to read this too) — see [The ledger](The-ledger) |
 | CLI framework | Python's built-in **argparse**, one subparser per command | Small, dependency-free surface — `propose`, `log-setup`, `log-review`, `abandon`, `stats`, `dump-ledger`, `fetch-analytics` |
-| External data | One plain HTTP call (`urllib`) to `pocket-dating-coach`'s internal endpoint, plus `urllib` against Snap's Marketing API | No SDK and no scraping. Snap credentials since 2026-08-26, for paused-only creation. Decision #10 was extended to Meta on 2026-08-27, but **no Meta credential is on disk and no Meta client is written yet** |
+| External data | One plain HTTP call (`urllib`) to `pocket-dating-coach`'s internal endpoint, plus `urllib` against Snap's Marketing API | No SDK and no scraping. Snap credentials since 2026-08-26 and Meta since 2026-08-27, both for paused-only creation. Two clients, two transport-layer refusals; `meta.py` pins Marketing API `v26.0` deliberately, because Meta began auto-upgrading unpinned callers on 2026-07-29 |
 | Packaging | `pyproject.toml`, installed with `pip install -e .` | Ships an `ad-agent` console-script entry point |
 | Config | A gitignored `config.local.yaml`, loaded with PyYAML | Real endpoint URL, API key, and DB connection string live here, never in code |
 

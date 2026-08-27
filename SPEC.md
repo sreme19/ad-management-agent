@@ -1,7 +1,8 @@
 # ad-management-agent — Spec
 
 **Status: v1 scaffold.** Ledger CLI (`propose` / `amend` / `note` / `log-setup` / `log-review` /
-`abandon` / `stats` / `dump-ledger` / `open` / `commands` / `fetch-analytics` / `snap-push`) and four
+`abandon` / `stats` / `dump-ledger` / `open` / `commands` / `fetch-analytics` / `snap-push` /
+`meta-push`) and four
 skills are built. `fetch-analytics` cannot do anything
 real yet — it depends on a small `pocket-dating-coach` PR (see "Data access") that has not landed.
 
@@ -46,11 +47,15 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
    account. The rules below are written per-network only where the networks actually differ; the
    paused-only discipline is identical on both. What stands now:
 
-   - The agent **may create** campaigns, ad squads, creatives and ads on Snap, through
-     `ad-agent snap-push`, and **only ever with status `PAUSED`**.
+   - The agent **may create** campaigns, ad squads/sets, creatives and ads on Snap through
+     `ad-agent snap-push` and on Meta through `ad-agent meta-push`, and **only ever with status
+     `PAUSED`**.
    - The agent **never enables anything, and never changes the budget of anything live.** There is no
-     enable, resume or activate call anywhere in `snap.py`, and none is to be added without the app
-     owner saying so in as many words. Starting spend stays a human action in Ads Manager.
+     enable, resume or activate call anywhere in `snap.py` or `meta.py`, and none is to be added
+     without the app owner saying so in as many words. Starting spend stays a human action in Ads
+     Manager. `meta.py` additionally refuses `DELETED` and `ARCHIVED`, which have no Snap counterpart:
+     Meta routes both through the same `status` field it enables through, and `ad-audit` has to be able
+     to read a pushed ad set months later to close its loop.
    - Every created object is **read back from the API and diffed** against the plan before the command
      exits. A 200 from a POST is not evidence that an ad squad targets who you think it targets.
    - The agent **reads the parent campaign's own spend caps before creating an ad squad under it**, and
@@ -199,7 +204,7 @@ Skill (live reasoning, in a Claude Code session)
   → persists through ad-agent's zero-API CLI (this repo)
        propose / amend / note / log-setup / log-review / abandon / stats / dump-ledger
   → optionally creates the ad set on Snap, PAUSED, and diffs it back
-       snap-push   (decision #3 as amended — creates, never enables)
+       snap-push / meta-push   (decision #3 as amended — creates, never enables)
   → pulls read-only data through ad-agent's zero-API CLI
        fetch-analytics  (channel 1: pocket-dating-coach's authenticated endpoint)
 
