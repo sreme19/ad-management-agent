@@ -448,6 +448,12 @@ class Research:
                 "A new finding on a closed question is a new question, or evidence on the "
                 "learning it produced."
             )
+        # Resolve the learning BEFORE mutating anything. Doing it afterwards closed
+        # the question, then raised on the bad reference — leaving it `answered`
+        # with no learning attached while the caller saw an error and reasonably
+        # assumed nothing had happened. Found by fumbling an id across midnight.
+        lrn = self.find(learning) if learning is not None else None
+
         rec.front_matter["status"] = "dropped" if dropped else "answered"
         rec.front_matter["answered"] = today
         rec.front_matter["learning"] = learning
@@ -455,8 +461,7 @@ class Research:
         rec.body = rec.body.rstrip() + f"\n\n## {heading} ({today})\n\n{text.strip()}\n"
         rec.save()
 
-        if learning is not None:
-            lrn = self.find(learning)
+        if lrn is not None:
             qs = lrn.front_matter.setdefault("questions", []) or []
             if question_id not in qs:
                 qs.append(question_id)

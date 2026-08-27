@@ -308,6 +308,14 @@ class TestQuestions:
         run(["answer", qid, "--text", "no longer relevant", "--dropped"])
         assert fm_of(ledger_root, "q", qid)["status"] == "dropped"
 
+    def test_a_bad_learning_reference_leaves_the_question_untouched(self, ledger_root):
+        # It used to close the question, then raise — leaving it `answered` with no
+        # learning while the caller saw an error and assumed nothing had happened.
+        run(self.ask())
+        qid = f"q-{today()}-q-a"
+        assert run(["answer", qid, "--text", "x", "--learning", "lrn-2020-01-01-nope"]) == 2
+        assert fm_of(ledger_root, "q", qid)["status"] == "open"
+
     def test_a_learning_can_close_the_question_it_answers(self, ledger_root):
         run(self.ask())
         qid = f"q-{today()}-q-a"
