@@ -60,8 +60,8 @@ candidates, let the rubric take the hit where it falls, and read the total.
 [ACTION/MOMENT]   a MOMENT, not a pose — mid-laugh, mid-turn, mid-step
 [SETTING]         ordinary Bangalore: a cream-walled flat, a doorway, a street in
                   warm afternoon light. Never nightclub, never luxury
-[LIGHT/GRADE]     Variant A: warm natural colour, cream ground (riteangle-native)
-                  Variant B: black-and-white, editorial contrast (Bumble B1)
+[LIGHT/GRADE]     warm natural colour, high-key, cream ground. Variant B
+                  (black-and-white) WITHDRAWN — the palette does not change
 [WARDROBE]        unbranded contemporary, muted
 [COMPOSITION]     web landing image, 4:5 and 3:4 crops must both work. NO text
 [NEGATIVE]        no text, no watermark, no logo, no luxury signifier, no man in
@@ -77,6 +77,24 @@ candidate there.
 
 **Fresh chat per distinct face** — round 1 established that Gemini edits anchor
 hard to the established subject.
+
+## Sharpened 2026-08-27 — five reference frames, and two constraints
+
+Sree supplied five Bumble frames after this brief was first written. They change
+it. See `prompts.md` for the frame-by-frame read and the dispatch-ready prompts;
+the short version is that the reference is not a colour, it is that **not one
+person in any of those frames is holding a neutral pose** — every one is mid-laugh,
+mid-motion or mid-activity, several with eyes shut.
+
+Two constraints settle what looked like open questions:
+
+- **The page palette does not change.** Sree, explicitly, this session. So the
+  yellow is out — no yellow ground, no yellow accents in CSS — and so is
+  black-and-white. `t1-bw` had already lost 3.5 rubric points for abandoning cream;
+  this closes it. Variant B is withdrawn from the lineup below.
+- **No couples.** Two of the five references are couples, and §1 names the couple
+  shot as the default failure mode. What transfers from them is the laughing, not
+  the pairing.
 
 ## Status
 
