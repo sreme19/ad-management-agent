@@ -339,8 +339,13 @@ class TestIdeas:
         assert run(idea(learning="lrn-2020-01-01-nope")) == 2
 
     def test_a_thin_budget_still_records_but_warns(self, ledger_root, capsys):
+        # Rs 300 became the accepted DEFAULT on 2026-08-28, but the warning stays:
+        # rules/budget.md keeps Rs 800-1,200 as the full-experiment threshold, and a
+        # read under it is directional. Recording at 300 is fine; recording it
+        # silently is not.
         assert run(idea(est_daily="300")) == 0
-        assert "below rules/budget.md" in capsys.readouterr().err
+        err = capsys.readouterr().err
+        assert "full-experiment threshold" in err and "directional" in err
 
 
 class TestIdeaToProposal:

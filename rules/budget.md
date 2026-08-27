@@ -10,11 +10,22 @@ Source: Sree's Aug 7 log. Every `ad-setup-loop` recommendation must state a budg
   economics are cracked (cost to acquire one active woman, one active man).
 - **Split:** 40–50% testing (new creative + audience variants) · 40–50% exploitation of proven winners
   · 10% retargeting/engagement once there's signal to retarget against.
-- **Minimum viable daily spend: ₹800–1,200 per active ad set.** Below this, the platform's delivery
-  algorithm rarely exits its learning phase — concentrate spend rather than spreading it thin across
-  many ad sets at once. (An earlier note mentions ₹100/day tests; that volume only tells you whether an
-  ad *can* deliver, not whether the offer or creative is any good — treat anything below the floor as a
-  system check, not a real experiment.)
+- **Default daily spend: ₹300 per ad set** — set by the app owner on 2026-08-28, applied live to the
+  first Meta ad set the same day, and the default `propose --budget-cap` uses. This is the operating
+  level, deliberately chosen for burn rate over read speed.
+- **Full-experiment threshold: ₹800–1,200 per active ad set — kept as calibration, no longer a floor.**
+  The original rule (Sree's Aug 7 log) made this a minimum, and its reasoning still stands: below
+  roughly this level the platform's delivery algorithm rarely exits its learning phase, so a read is
+  *directional*, not conclusive. What changed on 2026-08-28 is the decision, not the fact — running at
+  ₹300 is accepted, with its consequence stated rather than wished away:
+
+  **A ₹300/day test answers "does this deliver at all, and does anything look wrong?" It does not
+  reliably answer "is this creative/audience better than that one?"** `ad-audit` should expect
+  `inconclusive` as the normal verdict at this level, and a kill/double call made on a ₹300 read is a
+  judgment call, not evidence. When a test matters enough that its answer must be trusted — a bake-off
+  winner, a new audience thesis — raise that one ad set into the ₹800–1,200 band for its window and say
+  so on the record. (The earlier version of this rule called sub-floor volume "a system check, not a
+  real experiment"; that description now applies to the default itself, and is accepted.)
 
 ## Test → measure → kill/double → exploit loop
 

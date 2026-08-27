@@ -1540,10 +1540,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="the landing URL this ad set sends traffic to; checked against rules/destinations.yaml",
     )
     sp.add_argument(
-        "--budget-cap", type=float, default=300.0,
-        help="INR per day (default 300, set by the app owner 2026-08-28). NOTE: this is "
-             "below rules/budget.md's Rs 800 minimum viable floor, so propose will say "
-             "so on every record — see budget.py for why the floor exists")
+        "--budget-cap", type=float, default=budgetrules.DEFAULT_DAILY_INR,
+        help="INR per day (default: rules/budget.md's operating default, Rs 300 as of "
+             "2026-08-28). Reads below the Rs 800-1,200 full-experiment threshold are "
+             "directional — propose says so on the record; raise the cap for a test "
+             "whose answer must be trusted")
     sp.add_argument("--duration-days", required=True, type=int)
     sp.add_argument("--brief", required=True, help="path to a markdown brief file")
     sp.add_argument("--from-idea", default=None,
