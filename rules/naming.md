@@ -10,7 +10,7 @@ naming drift).
 ## Campaign
 
 ```
-RA_TRAFFIC_GET_IN_[GEO]_[FUNNEL]_[YYYYMM]
+RA_TRAFFIC_[DEST]_IN_[GEO]_[FUNNEL]_[YYYYMM]
 ```
 
 Example: `RA_TRAFFIC_GET_IN_BLR_TOF_202608`
@@ -19,11 +19,35 @@ Example: `RA_TRAFFIC_GET_IN_BLR_TOF_202608`
 |---|---|---|
 | `RA` | RiteAngle (brand short code) | `RA` |
 | `TRAFFIC` | Campaign objective (traffic to website) | `TRAFFIC` |
-| `GET` | Destination / landing page (`/get`) | `GET` |
+| `[DEST]` | Destination / landing page — see the token table below | `GET`, `GETW` |
 | `IN` | Country (India) | `IN` |
 | `[GEO]` | City/region | `BLR`, `DEL`, `HYD`, or `PAN` (pan-India) |
 | `[FUNNEL]` | Funnel stage | `TOF` (top of funnel), `MOF`, `BOF` |
 | `[YYYYMM]` | Launch month | `202608` |
+
+### `[DEST]` tokens
+
+One token per paid-traffic destination in `destinations.yaml`, which is the registry of record — this
+table follows it, never the other way round. A campaign whose `[DEST]` has no row here is not named
+yet; add the row when the destination opens to paid traffic.
+
+| Path | Token | Audience | Added |
+|---|---|---|---|
+| `/get` | `GET` | men | in production since 2026-08 |
+| `/get/w` | `GETW` | women | 2026-08-27 |
+
+`/beta` gets no token: `paid_traffic: false`, so no campaign can point at it.
+
+**A token may never contain `_`.** The name is underscore-delimited and parsed positionally, so
+`GET_W` would add a field and shift `IN`, `[GEO]`, `[FUNNEL]` and the month one place right —
+silently, since nothing validates the shape. `GETW` keeps the field count identical to the live
+`/get` campaigns, which is why it is the token and not the more readable alternative. Strip the
+slashes from the path and uppercase it.
+
+Nothing in `pocket-dating-coach` parses `[DEST]` back out of the campaign name — the landing page is
+carried independently by `ra_lp` (`ra_lp=get_w`) and the joins run on ids, so this token is for human
+legibility and for grouping in the network's own UI. That is also why the field count matters more
+than the token's content: drift in the shape breaks the *other* fields, not this one.
 
 ## Ad set
 
@@ -41,9 +65,11 @@ landing-page-view optimized). Matches the pattern already live, e.g. `MEN_25-40_
 [FORMAT]_[HOOK]_[VARIANT]_[DATE]
 ```
 
-`[FORMAT]` — `IMG`, `VID`, `STORY`, `COLLECTION`. `[HOOK]` — a short slug for the emotional hook used
-(see `creative-style.md`'s "ad-ready threads" for the vocabulary — e.g. `CAMERA-JUDGE`,
-`FOURTEEN-SUITORS`, `DESOLATE-MAN`). `[VARIANT]` — `A`/`B`/`C` for a/b tests of the same hook.
+`[FORMAT]` — `IMG`, `VID`, `STORY`, `COLLECTION`. `[HOOK]` — the slug of the emotional hook used, taken
+from `creative-style.md`'s "Ad-ready emotional threads", which is the closed vocabulary: every thread
+there carries its slug (`CAMERA-JUDGE`, `DESOLATE-MAN`, `FOURTEEN-SUITORS`, `VERIFIED-DELETED`,
+`MONOTONIC-PROGRESS`, `MOVE-ON-PROPER`). A hook with no thread has no slug — add the thread first,
+don't coin a slug at naming time. `[VARIANT]` — `A`/`B`/`C` for a/b tests of the same hook.
 
 ## Why this matters beyond tidiness
 

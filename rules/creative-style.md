@@ -32,16 +32,32 @@ a set):
 
 ## Ad-ready emotional threads (the strongest available hooks)
 
-- The camera as a judge nobody appointed — "Don't judge a book by its cover," and yet the biggest
-  decision of your life got handed to the camera.
-- The desolate man — months of silence, "like the Martian stranded on Mars," then one or two options
+**This list is the `[HOOK]` vocabulary** that `naming.md` requires every ad name to draw from, so each
+thread carries its slug. A hook that isn't here has no name yet — add the thread first, then name the
+ad. Slugs are uppercase, hyphenated, no underscores (the ad name is underscore-delimited).
+
+- **`CAMERA-JUDGE`** — the camera as a judge nobody appointed. "Don't judge a book by its cover," and
+  yet the biggest decision of your life got handed to the camera.
+- **`DESOLATE-MAN`** — months of silence, "like the Martian stranded on Mars," then one or two options
   that feel like being cornered rather than choosing.
-- The flooded woman who closes the tab — fourteen suitors, no order, tab closed. An ordered shortlist
-  is the product.
-- Proof that's verified, then deleted — he doesn't get points for saying it, he gets points for proving
-  it, and she never sees the document.
-- Progress that never slides backward — his standing is absolute and monotonic; he is never quietly
-  losing to men he cannot see.
+- **`FOURTEEN-SUITORS`** — the flooded woman who closes the tab: fourteen suitors, no order, tab
+  closed. An ordered shortlist is the product. *(Standing caveat as of 2026-08-27: the competitor scan
+  suggests this persona may be inverted — the complaint observed is quality of what reaches her, not
+  volume. See `research/questions/q-2026-08-27-is-the-riteangle-woman-flooded.md`. The thread is still
+  ad-ready; the persona behind it is under review.)*
+- **`VERIFIED-DELETED`** — proof that's verified, then deleted. He doesn't get points for saying it, he
+  gets points for proving it, and she never sees the document.
+- **`MONOTONIC-PROGRESS`** — progress that never slides backward. His standing is absolute and
+  monotonic; he is never quietly losing to men he cannot see.
+- **`MOVE-ON-PROPER`** — the breakup re-entry, in her register: moving on is not in question, *how* is.
+  "Move on toh karna hai — par dhang se." Not crying, not partying — the deliberate middle that
+  Tinder's breakup campaigns skip. The exit moment, where every thread above is an entry moment.
+  *(Added 2026-08-27 — derived in-session, not from the source docx. Origin:
+  `ideas/idea-2026-08-27-breakup-reentry-second-chapter.md`, approved by Sree after reviewing Tinder's
+  Move On Salon creatives; learnings `lrn-2026-08-27-tinder-sells-the-breakup` and
+  `lrn-2026-08-27-hinglish-is-shaadis-hook-mechanic`. Carries an unresolved risk: no comment-moderation
+  policy exists for the hostility a breakup hook attracts — surface it again before anything is
+  enabled.)*
 
 ## Quotable first-party stats — use these, not invented or industry-borrowed numbers
 
