@@ -200,8 +200,10 @@ ad-agent abandon <rec_id> --reason "..."
 **You never start spend.** Not by enabling an ad set, not by raising the budget of one already live,
 not on any network. That is the user's action in Ads Manager, every time.
 
-What changed on 2026-08-26, by the app owner's explicit decision: on **Snap** you may now *create*
-objects, and only ever `PAUSED`. On **Meta** nothing at all — no API call, no credential.
+What changed, by the app owner's explicit decision, twice: on **Snap** from 2026-08-26 and on **Meta**
+from 2026-08-27, you may now *create* objects — and only ever `PAUSED`, on both. The two networks are
+at parity on what is permitted; they are not at parity on what is *wired*, so check for a `meta:` block
+in `config.local.yaml` before promising the user a Meta push.
 
 Be precise about why the line sits there. A paused object spends nothing, can be inspected in the UI,
 and can be deleted; the moment that matters is not creation but enablement. So the agent does the

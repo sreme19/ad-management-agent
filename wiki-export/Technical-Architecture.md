@@ -102,10 +102,12 @@ with a clear stderr message and a non-zero status rather than guessing at a resu
 - **No server, no daemon, no cron in this repo.** Every mode is triggered by asking for it in a Claude
   Code session. `ad-audit` is the one candidate for a future scheduled task (`SPEC.md` decision #2), and
   only once it's been trusted from repeated manual runs — not attempted yet.
-- **No Meta Marketing API client, and no Meta credential anywhere in config or code** &mdash; still true
-  as of this page, though decisions #3/#10 were extended to Meta on 2026-08-27 and a client is now
-  permitted (Marketing API v26.0, app `1020330197292995`, system user `riteangle-api`). Snap is the
-  exception, and only since 2026-08-26: `snap.py` is a ~240-line `urllib` client with no SDK, holding
+- **Two Marketing API clients, no SDK between them.** `meta.py` was added 2026-08-27 when decisions
+  #3/#10 were extended to Meta; it pins Marketing API `v26.0` deliberately, because Meta began
+  auto-upgrading unpinned callers on 2026-07-29 and an auto-upgrade that changes a payload's meaning is
+  not something to discover through a live ad account. Whether a Meta *credential* exists is a question
+  about `config.local.yaml`, which is gitignored &mdash; this page cannot answer it and does not try.
+  Snap came first, on 2026-08-26: `snap.py` is a ~240-line `urllib` client with no SDK, holding
   credentials in gitignored `config.local.yaml`, minting access tokens per run and never writing them
   to disk. It can create — always `PAUSED` — and it cannot enable anything or change a live budget,
   refused at the transport layer rather than by convention. See
