@@ -10,8 +10,10 @@ against the same hardcoded dict rather than against the brief.
 So a record now carries both: prose for the human, and a normalized `targeting`
 block for the pusher. The prose may say anything; this block is validated.
 
-Kept network-neutral on purpose. `to_snap()` is the only Snap-shaped thing here,
-so a second network adds a translator rather than a second spec format.
+Kept network-neutral on purpose, and that paid off on 2026-08-27: adding Meta was a
+second translator (`to_meta`) plus a second read-back builder, not a second spec
+format. The spec the ledger stores is unchanged, so one record can be pushed to
+either network without being rewritten.
 """
 from __future__ import annotations
 
@@ -22,6 +24,19 @@ OS_TYPES = ("ANDROID", "IOS")
 
 # Snap spells its device values this way; ours are uppercase for CLI symmetry.
 _SNAP_OS = {"ANDROID": "ANDROID", "IOS": "iOS"}
+
+# Meta disagrees with Snap on the type of nearly every field in this spec, which is
+# the whole reason a translator exists per network rather than one shared payload:
+#   gender   Snap "FEMALE"        Meta 2        (1 = male, 2 = female)
+#   ages     Snap "18" / "50+"    Meta 18 / 65  (ints; 65 is Meta's open-ended top)
+#   country  Snap "in"            Meta "IN"     (uppercase)
+#   os       Snap "iOS"           Meta "iOS"    (agrees, by luck rather than design)
+_META_GENDER = {"MALE": 1, "FEMALE": 2}
+_META_OS = {"ANDROID": "Android", "IOS": "iOS"}
+
+# Meta has no open-ended age band the way Snap's `50+` is. Its maximum is 65, which
+# Meta itself renders as "65+", so an open-ended spec maps onto it.
+META_MAX_AGE = 65
 
 # compliance.md: "18+ without exception". Snap's own dating category enforces it
 # on top of our rule, so a spec below 18 is refused here rather than rejected
@@ -191,4 +206,80 @@ def snap_readback_checks(spec: dict, squad_live: dict) -> list[tuple[str, object
     if spec.get("os"):
         devices = live.get("devices") or [{}]
         rows.append(("os", devices[0].get("os_type"), _SNAP_OS[spec["os"]]))
+    return rows
+
+
+def _meta_age(value, field: str) -> int:
+    """Meta's ages are ints, where Snap's are strings. `50+` maps onto Meta's 65 top."""
+    s = _age(value, field)
+    return META_MAX_AGE if s.endswith("+") else int(s)
+
+
+def to_meta(spec: dict) -> dict:
+    """Translate the spec into a Meta ad-set `targeting` payload.
+
+    Two things here are not translations but decisions, and both are recorded rather
+    than buried:
+
+    `regulated_content` has no Meta equivalent. Snap has an explicit flag for
+    regulated categories and dating is one; Meta handles dating as an account-level
+    written permission instead, so there is no field to set. The spec's flag is
+    therefore dropped here on purpose — not forgotten. If it were silently mapped to
+    something plausible-looking, a reader would believe a declaration had been made
+    that had not.
+
+    `expansion` maps onto Advantage Audience, which is Meta's audience-broadening
+    control and the closest analogue to Snap's targeting expansion. Note the polarity
+    trap: Meta expresses it as `advantage_audience: 1` to expand and `0` to hold the
+    audience as specified, so an omitted field is not a neutral default — recent Meta
+    behaviour is to broaden unless told not to. It is written explicitly in both
+    directions for that reason. This matters for the live women's records, whose whole
+    premise is a specific age band: an ad set that quietly broadened would answer a
+    different question than the one it was created to answer.
+    """
+    validate(spec)
+    payload: dict = {
+        "age_min": _meta_age(spec["min_age"], "min_age"),
+        "age_max": _meta_age(spec["max_age"], "max_age"),
+        "genders": [_META_GENDER[spec["gender"]]],
+        "geo_locations": {
+            "countries": [c.upper() for c in spec["countries"]],
+            "location_types": ["home", "recent"],
+        },
+        "targeting_automation": {
+            "advantage_audience": 1 if spec.get("expansion", True) else 0,
+        },
+    }
+    if spec.get("os"):
+        payload["user_os"] = [_META_OS[spec["os"]]]
+    return payload
+
+
+def meta_readback_checks(spec: dict, adset_live: dict) -> list[tuple[str, object, object]]:
+    """(label, got, want) rows comparing a live Meta ad set against this spec.
+
+    Derived from the spec, never from a literal — the same rule as
+    `snap_readback_checks`, for the same reason: a read-back diffed against a
+    hardcoded dict only ever validates the code against itself, which is how a wrong
+    audience passes silently.
+
+    Read-back matters more on Meta than on Snap, because Meta rewrites targeting it
+    considers suboptimal rather than rejecting it. An ad set can be created with
+    `advantage_audience: 0` and come back broadened, and the POST still returns 200.
+    That is precisely the case a diff catches and a docstring does not.
+    """
+    live = adset_live.get("targeting") or {}
+    geo = live.get("geo_locations") or {}
+    rows: list[tuple[str, object, object]] = [
+        ("gender", (live.get("genders") or [None])[0], _META_GENDER[spec["gender"]]),
+        ("min age", live.get("age_min"), _meta_age(spec["min_age"], "min_age")),
+        ("max age", live.get("age_max"), _meta_age(spec["max_age"], "max_age")),
+        ("countries", ",".join(sorted(geo.get("countries") or [])),
+         ",".join(sorted(c.upper() for c in spec["countries"]))),
+        ("advantage audience",
+         (live.get("targeting_automation") or {}).get("advantage_audience"),
+         1 if spec.get("expansion", True) else 0),
+    ]
+    if spec.get("os"):
+        rows.append(("os", ",".join(live.get("user_os") or []), _META_OS[spec["os"]]))
     return rows

@@ -365,10 +365,14 @@ are what hold. `tests/test_networks.py` asserts both directions.
 on 2026-08-27, so the *permission* is granted — but permission is not capability, and the registry
 describes what the code can do, not what the app owner has agreed to. Flipping the field the moment
 the decision changed would delete a live refusal and put nothing behind it, and would leave a future
-session reading `paused-only` and reasonably concluding a push path exists. The flip belongs in the
-same commit as `meta.py` and its safety tests, and `test_require_creation_refuses_meta` is the thing
-holding that ordering in place — when it is changed, it should be changed to assert the new direction,
-never simply deleted.
+session reading `paused-only` and reasonably concluding a push path exists.
+
+The flip belongs with the **push path**, meaning the client *and* a CLI command that calls it — not
+with the client alone. `meta.py` and its safety tests landed on 2026-08-27 and the registry
+deliberately did not move, because a client no command invokes is not yet a way to create anything,
+and `paused-only` would have been describing a capability that still had no entry point.
+`test_require_creation_refuses_meta` is what holds that ordering in place — when it is changed, it
+should be changed to assert the new direction, never simply deleted.
 
 ## Rules (single source of truth — read live, edited in place when refined)
 

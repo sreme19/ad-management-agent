@@ -105,3 +105,80 @@ class TestReadBackIsDerivedNotHardcoded:
             "geos": [{"country_code": "in"}], "devices": [{"os_type": "ANDROID"}]}}
         assert [r for r in targeting.snap_readback_checks(spec(), live)
                 if str(r[1]) != str(r[2])] == []
+
+
+class TestMetaTranslation:
+    """One spec, two networks. Meta disagrees with Snap on nearly every field type."""
+
+    def test_gender_becomes_an_integer_code(self):
+        assert targeting.to_meta(spec(gender="FEMALE"))["genders"] == [2]
+        assert targeting.to_meta(spec(gender="MALE"))["genders"] == [1]
+
+    def test_ages_become_integers_not_strings(self):
+        payload = targeting.to_meta(spec(min_age="25", max_age="30"))
+        assert payload["age_min"] == 25 and payload["age_max"] == 30
+        assert isinstance(payload["age_min"], int)
+
+    def test_open_ended_max_age_maps_onto_metas_top_band(self):
+        # Snap's `50+` has no Meta equivalent; Meta's maximum is 65, rendered "65+".
+        assert targeting.to_meta(spec(max_age="50+"))["age_max"] == targeting.META_MAX_AGE
+
+    def test_countries_are_uppercased(self):
+        assert targeting.to_meta(spec())["geo_locations"]["countries"] == ["IN"]
+
+    def test_expansion_polarity_is_written_explicitly_both_ways(self):
+        # The trap: Meta broadens unless told not to, so an omitted field is not a
+        # neutral default. Both directions must appear in the payload.
+        on = targeting.to_meta(spec(expansion=True))["targeting_automation"]
+        off = targeting.to_meta(spec(expansion=False))["targeting_automation"]
+        assert on["advantage_audience"] == 1
+        assert off["advantage_audience"] == 0
+
+    def test_regulated_content_is_dropped_rather_than_invented(self):
+        # Snap has a flag for it; Meta handles dating as an account-level written
+        # permission and has no field. Mapping it to something plausible-looking
+        # would make a reader believe a declaration was made that was not.
+        payload = targeting.to_meta(spec())
+        assert not any("regulated" in k for k in payload)
+
+    def test_the_snap_payload_is_untouched_by_the_meta_one(self):
+        # One stored spec, two translators — the point of keeping the spec neutral.
+        s = spec()
+        snap_payload = targeting.to_snap(s)
+        targeting.to_meta(s)
+        assert targeting.to_snap(s) == snap_payload
+
+
+class TestMetaReadback:
+    def test_a_broadened_adset_is_caught(self):
+        # Meta rewrites targeting it considers suboptimal rather than rejecting it:
+        # an ad set created with advantage_audience 0 can come back 1, with the POST
+        # still returning 200. This is the case a diff catches.
+        live = {"targeting": {
+            "genders": [2], "age_min": 25, "age_max": 30,
+            "geo_locations": {"countries": ["IN"]},
+            "targeting_automation": {"advantage_audience": 1},
+            "user_os": ["Android"]}}
+        rows = targeting.meta_readback_checks(
+            spec(min_age="25", max_age="30", expansion=False), live)
+        assert [label for label, got, want in rows if str(got) != str(want)] \
+            == ["advantage audience"]
+
+    def test_a_matching_adset_produces_no_diff(self):
+        live = {"targeting": {
+            "genders": [2], "age_min": 23, "age_max": 30,
+            "geo_locations": {"countries": ["IN"]},
+            "targeting_automation": {"advantage_audience": 1},
+            "user_os": ["Android"]}}
+        assert [r for r in targeting.meta_readback_checks(spec(), live)
+                if str(r[1]) != str(r[2])] == []
+
+    def test_a_wrong_audience_is_caught(self):
+        live = {"targeting": {
+            "genders": [1], "age_min": 18, "age_max": 22,
+            "geo_locations": {"countries": ["US"]},
+            "targeting_automation": {"advantage_audience": 1},
+            "user_os": ["Android"]}}
+        rows = targeting.meta_readback_checks(spec(), live)
+        assert [label for label, got, want in rows if str(got) != str(want)] \
+            == ["gender", "min age", "max age", "countries"]

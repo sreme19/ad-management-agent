@@ -40,3 +40,44 @@ snap:
   refresh_token: ""
   profile_id: ""
   pixel_id: ""
+
+meta:
+  # Meta Marketing API credentials, for the Meta client (src/.../meta.py).
+  #
+  # NOTE: holding these reverses the Meta half of SPEC.md decision #10, which had
+  # kept any credential that could reach a live Meta account out of this repo.
+  # That reversal is the app owner's explicit call (2026-08-27) and is recorded in
+  # SPEC.md — it is not an oversight.
+  #
+  # Base URL https://graph.facebook.com/v26.0 (pinned in meta.py: Meta began
+  # auto-upgrading unpinned callers on 2026-07-29, and versions expire).
+  app_id: ""
+  app_secret: ""
+
+  # A SYSTEM-USER token, not a user token. Generated in Business settings >
+  # System users > riteangle-api > Generate token, with scopes ads_management,
+  # ads_read, business_management, pages_show_list, pages_read_engagement,
+  # pages_manage_ads.
+  #
+  # It does NOT expire, which is why this shape was chosen: a long-lived user
+  # token lasts ~60 days and Meta has no refresh-token equivalent, so it would
+  # expire mid-campaign, silently. Like the Snap client secret, it is shown once
+  # at creation and there is no regenerate — keep it somewhere durable.
+  access_token: ""
+
+  # The `act_` prefix is optional here; the client adds it if absent. This account
+  # has to be owned by the business portfolio, not personal, or a system user
+  # cannot be assigned it at all.
+  ad_account_id: ""
+
+  # The Page the ad renders under. Not optional and with no Snap equivalent: a
+  # Snap ad renders under a profile_id, whereas a Meta ad IS a post by a Page.
+  # Read the id off the ACTIVE Riteangle Page — the account also holds a
+  # deactivated Page of the same name, so a name lookup would be ambiguous.
+  page_id: ""
+
+  # Meta Pixel / dataset. Required for LANDING_PAGE_VIEWS optimisation, and
+  # stricter than Snap: Snap counts landing-page views natively in its in-app
+  # browser, so a pixel-less Snap squad still reported 59 of them. Meta has no
+  # such fallback — no pixel means no signal at all.
+  pixel_id: ""
