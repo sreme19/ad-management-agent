@@ -518,6 +518,29 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
         if not ok:
             print(f"        {'':18} expected: {want}")
 
+    # Meta's per-feature creative enhancements, reported rather than assumed. The
+    # single standard_enhancements opt-out was deprecated on 2026-08-28 and its
+    # replacement names are documented only behind an internal URL, so the honest
+    # thing is to print what Meta actually turned on and let a human decide. An
+    # enhancement applied after rules/creative-generation.md's §10 QA gate voids the
+    # sign-off that gate exists to give.
+    dof = (creative_live.get("degrees_of_freedom_spec") or {}).get(
+        "creative_features_spec") or {}
+    opted_in = sorted(k for k, v in dof.items()
+                      if str((v or {}).get("enroll_status", "")).upper() == "OPT_IN")
+    if opted_in:
+        print()
+        print("CREATIVE ENHANCEMENTS Meta enabled by itself — the QA gate signed off on")
+        print("the asset as built, and these change it after that sign-off:")
+        for k in opted_in:
+            print(f"  OPT_IN  {k}")
+        print("  Turn them off per-ad in Ads Manager (Advantage+ creative) before enabling,")
+        print("  or accept them deliberately. Names captured for a precise opt-out:")
+        print(f"    {', '.join(opted_in)}")
+    elif dof:
+        print()
+        print(f"creative enhancements: none opted in ({len(dof)} feature(s) reported)")
+
     print()
     if bad:
         print(f"{bad} field(s) differ from the plan. Fix in Ads Manager before enabling.")
@@ -724,22 +747,39 @@ def cmd_meta_push(args: argparse.Namespace, ledger: Ledger) -> None:
         url=fm["destination_url"], call_to_action=args.cta)
     print(f"creative  created {creative['id']}")
 
-    ad = client.create_ad(name=fm["ad_name"], adset_id=adset["id"],
-                          creative_id=creative["id"])
-    print(f"ad        created {ad['id']}")
+    ad = client.find_ad(fm["ad_name"], adset["id"])
+    if ad:
+        print(f"ad        reusing {ad['id']} (already existed under this ad set)")
+    else:
+        ad = client.create_ad(name=fm["ad_name"], adset_id=adset["id"],
+                              creative_id=creative["id"])
+        print(f"ad        created {ad['id']}")
 
+    # The ad id only exists now, and utm_content has to carry it on Meta. Neither the
+    # ad nor an existing creative accepts url_tags after the fact — the ad-level POST
+    # returns 200 and silently does nothing — so the tracking arrives as a new
+    # creative built with url_tags at creation, which the ad is then repointed at.
+    # See MetaClient.attach_tracked_creative for what was tried and what persists.
     url_tags = _utm_query(ledger.root / "rules", "meta", fm["campaign_name"],
                           adset["id"], ad["id"], fm["ad_name"])
-    client.set_ad_url_tags(ad["id"], url_tags)
-    print("ad        url_tags written with the real ad id (no {{macro}} to not resolve)")
+    creative = client.attach_tracked_creative(
+        ad_id=ad["id"], creative=client.get(
+            f"/{creative['id']}", fields="id,object_story_spec"),
+        url_tags=url_tags, name=f'{fm["ad_name"]}_CREATIVE_TRACKED')
+    print(f"creative  {creative['id']} attached, url_tags carry the real ad id "
+          f"(no {{{{macro}}}} to not resolve)")
 
     # ---- read back, and diff against what was asked for ----
     print("\nRead-back:")
     adset_live = client.get(
         f"/{adset['id']}",
         fields="id,name,status,daily_budget,optimization_goal,billing_event,targeting")
-    ad_live = client.get(f"/{ad['id']}", fields="id,name,status,url_tags,creative")
-    creative_live = client.get(f"/{creative['id']}", fields="id,name,object_story_spec")
+    # url_tags is NOT a readable field on an ad — asking for it 400s the whole
+    # read-back ("Tried accessing nonexisting field"). It lives on the creative.
+    ad_live = client.get(f"/{ad['id']}", fields="id,name,status,creative")
+    creative_live = client.get(
+        f"/{creative['id']}",
+        fields="id,name,url_tags,object_story_spec,degrees_of_freedom_spec")
     link_data = ((creative_live.get("object_story_spec") or {}).get("link_data") or {})
 
     checks = [
@@ -756,7 +796,9 @@ def cmd_meta_push(args: argparse.Namespace, ledger: Ledger) -> None:
         *targetingspec.meta_readback_checks(spec, adset_live),
         ("headline", link_data.get("name"), args.headline),
         ("landing url", link_data.get("link"), fm["destination_url"]),
-        ("url_tags", ad_live.get("url_tags"), url_tags),
+        ("url_tags", creative_live.get("url_tags"), url_tags),
+        ("ad points at creative", (ad_live.get("creative") or {}).get("id"),
+         creative["id"]),
     ]
     bad = 0
     for label, got, want in checks:
@@ -765,6 +807,29 @@ def cmd_meta_push(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"  {'ok ' if ok else 'DIFF'}  {label:22} {got}")
         if not ok:
             print(f"        {'':22} expected: {want}")
+
+    # Meta's per-feature creative enhancements, reported rather than assumed. The
+    # single standard_enhancements opt-out was deprecated on 2026-08-28 and its
+    # replacement names are documented only behind an internal URL, so the honest
+    # thing is to print what Meta actually turned on and let a human decide. An
+    # enhancement applied after rules/creative-generation.md's §10 QA gate voids the
+    # sign-off that gate exists to give.
+    dof = (creative_live.get("degrees_of_freedom_spec") or {}).get(
+        "creative_features_spec") or {}
+    opted_in = sorted(k for k, v in dof.items()
+                      if str((v or {}).get("enroll_status", "")).upper() == "OPT_IN")
+    if opted_in:
+        print()
+        print("CREATIVE ENHANCEMENTS Meta enabled by itself — the QA gate signed off on")
+        print("the asset as built, and these change it after that sign-off:")
+        for k in opted_in:
+            print(f"  OPT_IN  {k}")
+        print("  Turn them off per-ad in Ads Manager (Advantage+ creative) before enabling,")
+        print("  or accept them deliberately. Names captured for a precise opt-out:")
+        print(f"    {', '.join(opted_in)}")
+    elif dof:
+        print()
+        print(f"creative enhancements: none opted in ({len(dof)} feature(s) reported)")
 
     print()
     if bad:

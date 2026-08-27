@@ -505,15 +505,25 @@ class MetaClient:
                     "call_to_action": {"type": call_to_action},
                 },
             },
-            "degrees_of_freedom_spec": {
-                # Meta will otherwise "improve" the creative on its own — recropping,
-                # restyling, generating variants. rules/creative-generation.md's QA gate
-                # signs off on a specific 1080x1920 asset with specific type on it; an
-                # enhancement applied after that gate makes the sign-off meaningless.
-                "creative_features_spec": {
-                    "standard_enhancements": {"enroll_status": "OPT_OUT"}
-                }
-            },
+            # NOTE: no degrees_of_freedom_spec is sent, and that is not the same as
+            # not caring. Meta will "improve" a creative on its own — recropping,
+            # restyling, generating variants — and rules/creative-generation.md's §10
+            # QA gate signs off on a specific 1080x1920 asset with specific type, so an
+            # enhancement applied after that gate makes the sign-off meaningless.
+            #
+            # The opt-out used to be a single `standard_enhancements: OPT_OUT`. On
+            # 2026-08-28 Meta began rejecting that outright: "Including standard
+            # enhancements field in creative has been deprecated. Please choose to set
+            # individual features instead." Its error links to fburl.com/hyth50xo,
+            # which redirects to internalfb.com and is not publicly readable, so the
+            # replacement key names could not be looked up.
+            #
+            # Rather than guess field names against a live account, the creative is
+            # created without the block and `meta-push` reads
+            # `degrees_of_freedom_spec` back and reports every feature Meta actually
+            # switched on. That turns a guess into an observation, and the observed
+            # names are what a precise per-feature opt-out should be built from.
+            # See q-2026-08-28-meta-individual-creative-features.
         })
 
     def create_ad(self, *, name, adset_id, creative_id) -> dict:
@@ -524,18 +534,84 @@ class MetaClient:
             "status": "PAUSED",
         })
 
-    def set_ad_url_tags(self, ad_id: str, url_tags: str) -> dict:
-        """Write the tracking parameters onto the ad once its real id exists.
+    def find_ad(self, name: str, adset_id: str) -> dict | None:
+        """Exact-name lookup under one ad set, so a retry resumes instead of duplicating.
 
-        rules/tracking.md requires the ad id to reach the analytics, and on Meta the
-        joining parameter is `utm_content` where Snap uses `utm_id` (per
-        traffic-quality.ts). The ad does not exist when the creative is created, so
-        the creative's link cannot carry it.
-
-        Ads Manager solves this with a {{ad.id}} macro — the same class of macro whose
-        silent non-resolution cost a week of unattributable spend on 2026-08-21. Here
-        the id is a known fact by the time this runs, so the value is written literally
-        and there is no macro left to fail. This is an update (POST to a bare id), and
-        it passes the guard because it carries no budget key and no status.
+        The sibling of `find_adset`, and it exists for the same reason: this push has
+        five objects, no rollback, and failed three separate times on 2026-08-28 —
+        twice after the ad already existed. Without this, each retry minted another ad.
         """
-        return self.post(f"/{ad_id}", {"url_tags": url_tags})
+        res = self.get(f"/{adset_id}/ads", fields="id,name,status,creative")
+        hits = [a for a in res.get("data", []) if a.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h["id"] for h in hits)
+            raise MetaError(
+                f"{len(hits)} ads under ad set {adset_id} are named {name!r} ({ids}).\n"
+                "Refusing to guess which one this record means — delete or rename the "
+                "duplicate in Ads Manager first. See rules/naming.md."
+            )
+        return hits[0] if hits else None
+
+    def attach_tracked_creative(self, *, ad_id: str, creative: dict, url_tags: str,
+                                name: str) -> dict:
+        """Give a live ad a creative whose tracking carries that ad's own real id.
+
+        This is Meta's answer to the problem `snap.py.set_creative_url` solves, and it
+        needs a different shape because Meta's objects are less mutable than Snap's:
+
+          * `rules/tracking.md` requires the ad id to reach the analytics, and on Meta
+            the joining parameter is `utm_content` (confirmed in traffic-quality.ts).
+            The ad does not exist when its first creative is built, so the first
+            creative cannot carry it.
+          * `url_tags` on an **ad** looked like the answer and is not. POSTing it to
+            `/{ad_id}` returns 200 and does not persist — read back as `None` on
+            2026-08-28. A silent no-op is worse than an error, and it is exactly why
+            decision #3 requires reading every object back rather than trusting a 200.
+          * `url_tags` on an existing **creative** cannot be set either: Meta answers
+            "Please specify the name, status or associated advert labels to update the
+            creative." Creatives are effectively immutable once made.
+
+        What does work, verified against the live account: create a NEW creative with
+        `url_tags` set at creation — where it persists — and repoint the ad at it. The
+        ad id is stable across that swap, so the literal id written into `utm_content`
+        stays correct.
+
+        The consequence, stated rather than hidden: every ad this pushes leaves one
+        superfluous untracked creative behind, the provisional one built before the ad
+        existed. It is unused and costs nothing, and `meta.py` cannot delete it by
+        design. The alternative was Meta's `{{ad.id}}` macro, and an unresolved macro
+        cost a week of unattributable spend on 2026-08-21 — while `adSetKeyOf` rejects
+        any value containing `{{` as absent, so a macro that fails to resolve produces
+        no attribution at all. A spare object is the cheaper failure.
+        """
+        link = (creative.get("object_story_spec") or {}).get("link_data") or {}
+        tracked = self.post(f"/{self.account_path}/adcreatives", {
+            "name": name,
+            "object_story_spec": {
+                "page_id": str(self.cfg["page_id"]),
+                "link_data": {
+                    "image_hash": link.get("image_hash"),
+                    "link": link.get("link"),
+                    "name": link.get("name"),
+                    "message": link.get("message"),
+                    "call_to_action": link.get("call_to_action"),
+                },
+            },
+            "url_tags": url_tags,
+        })
+        got = self.get(f"/{tracked['id']}", fields="id,url_tags").get("url_tags")
+        if got != url_tags:
+            raise MetaError(
+                f"creative {tracked['id']} was created but its url_tags read back as "
+                f"{got!r}, not the tracking string asked for.\nRefusing to attach an "
+                "untracked creative — an ad that spends without attribution is the "
+                "2026-08-21 failure. Set the tracking by hand in Ads Manager."
+            )
+        self.post(f"/{ad_id}", {"creative": {"creative_id": str(tracked["id"])}})
+        after = self.get(f"/{ad_id}", fields="id,status,creative")
+        if (after.get("creative") or {}).get("id") != str(tracked["id"]):
+            raise MetaError(
+                f"asked Meta to point ad {ad_id} at creative {tracked['id']} but it "
+                f"still reads {(after.get('creative') or {}).get('id')!r}. Fix by hand."
+            )
+        return tracked

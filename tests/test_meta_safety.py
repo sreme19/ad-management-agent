@@ -312,3 +312,63 @@ class TestObjectsAreCreatedOnTheRightEndpoint:
                      "/act_1/adcreatives", "/act_1/adimages"):
             assert metaapi._is_create("POST", path), path
             assert violations("POST", path, {"daily_budget": 100_000}) == []
+
+
+class TestTrackingSurvivesMetasImmutability:
+    """The url_tags saga of 2026-08-28, encoded so it cannot silently regress.
+
+    Three shapes were tried against the live account. Only the third persists:
+      1. POST url_tags to /{ad_id}          -> 200, and read back as None. A SILENT
+                                               no-op, which is why decision #3 requires
+                                               reading every object back.
+      2. POST url_tags to /{creative_id}    -> 400, "specify the name, status or
+                                               associated advert labels". Creatives are
+                                               effectively immutable.
+      3. Create a NEW creative WITH url_tags, then repoint the ad at it -> works.
+    """
+
+    def test_the_ad_level_url_tags_writer_is_gone(self):
+        assert not hasattr(metaapi.MetaClient, "set_ad_url_tags"), (
+            "set_ad_url_tags returned 200 and never persisted — it must not come back"
+        )
+
+    def test_the_tracked_creative_path_exists_and_verifies_itself(self):
+        import inspect
+        assert hasattr(metaapi.MetaClient, "attach_tracked_creative")
+        src = inspect.getsource(metaapi.MetaClient.attach_tracked_creative)
+        body = src.split('"""')[-1]
+        # url_tags must be set at CREATION, on the adcreatives collection.
+        assert '"url_tags": url_tags' in body
+        assert "adcreatives" in body
+        # And it must read back and refuse rather than trust the 200 that fooled it.
+        assert "if got != url_tags" in body
+        assert "url_tags" in body and "raise MetaError" in body
+
+    def test_attaching_a_creative_is_not_blocked_by_the_safety_guard(self):
+        # Repointing an ad is an update carrying no status and no budget key.
+        assert violations("POST", "/23844", {"creative": {"creative_id": "99"}}) == []
+
+    def test_creating_a_creative_with_tracking_is_allowed(self):
+        assert violations("POST", "/act_1/adcreatives", {
+            "name": "X_CREATIVE_TRACKED",
+            "url_tags": "utm_source=fb&utm_content=23844"}) == []
+
+
+class TestEveryLevelIsResumable:
+    """No rollback and five objects means a partial run is a normal state.
+
+    The first real push failed three times, twice with objects already created. Each
+    level needs an exact-name finder or a retry mints duplicates — which is the
+    collision find_campaign already refuses to guess through, and which would break
+    pocket-dating-coach's ad-set rollup.
+    """
+
+    @pytest.mark.parametrize("finder", ["find_campaign", "find_adset", "find_ad"])
+    def test_a_finder_exists_at_each_level(self, finder):
+        assert callable(getattr(metaapi.MetaClient, finder, None))
+
+    @pytest.mark.parametrize("finder", ["find_campaign", "find_adset", "find_ad"])
+    def test_each_finder_refuses_rather_than_guessing(self, finder):
+        import inspect
+        src = inspect.getsource(getattr(metaapi.MetaClient, finder))
+        assert "len(hits) > 1" in src and "raise MetaError" in src

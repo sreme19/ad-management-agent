@@ -28,7 +28,7 @@ budget_cap_inr_per_day: 1000.0
 duration_days: 5
 from_idea: idea-2026-08-27-breakup-reentry-second-chapter
 created: '2026-08-27'
-last_note: '2026-08-27'
+last_note: '2026-08-28'
 campaign_daily_cap_inr: null
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-28'
@@ -102,3 +102,7 @@ TRACKING IS UNPROVEN ON THIS NETWORK. Per lrn-2026-08-27-meta-ads-carry-no-utms,
 ## Note — observation (2026-08-27)
 
 No comment-moderation policy exists for the hostility a public breakup hook attracts. Carried from the original brief on 2026-08-27 and still unaddressed. Meta comments are more exposed than Snap's, since a Meta ad IS a Page post and accumulates public replies under the Riteangle Page.
+
+## Note — incident (2026-08-28)
+
+Pushed to Meta PAUSED on 2026-08-28 and read back clean, 13/13 fields matching. Real ids: campaign 6984035763681, ad set 6984035818681, ad 6984036525881, tracked creative 3381749368661464. url_tags on the creative carry literal values with no macro: utm_source=fb, utm_term=6984035818681 (ad set id), utm_content=6984036525881 (ad id, which is what traffic-quality.ts joins on for Meta). Advantage Audience read back 0, so the 25-30 band held and was not silently broadened. All 83 creative enhancement features report OPT_OUT, so the QA-passed asset is intact. HOUSEKEEPING: the push took four attempts and left orphaned untracked creatives behind (1812181563532325, 3546135838888885, 982834978110685) plus duplicate uploaded images. All unused and costing nothing; meta.py cannot delete them by design, so remove them by hand in Ads Manager if the clutter matters.
