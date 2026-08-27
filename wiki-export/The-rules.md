@@ -1,6 +1,6 @@
 # The rules
 
-Every skill reads eight files under `rules/` live, every time &mdash; never from memory, and never
+Every skill reads ten files under `rules/` live, every time &mdash; never from memory, and never
 restated inside a skill file. If a rule gets refined mid-conversation, the skill edits the file in place
 in the same turn; these are living documents, not a snapshot taken once and reused forever. This mirrors
 `job-hunt-agent`'s own pattern (its `research.py` fit filter and `draft.py` style rules work the same
@@ -18,10 +18,11 @@ flowchart TB
     Generation["rules/creative-generation.md\nPOV rule, Grok prompt skeleton,\nnegative list, QA gate"]
     Destinations["rules/destinations.yaml\nwhose POV each landing page\noccupies — enforced in code"]
     Networks["rules/networks.yaml\nper-network UTM conventions,\nand what may be created — read by the code"]
+    Funnel["rules/funnel.md\nthe format x capture x follow-up\nmatrix, and the friction ladder"]
 
-    Setup["ad-setup-loop"] --> Compliance & Targeting & Creative & Generation & Destinations & Networks & Naming & Budget & Tracking
+    Setup["ad-setup-loop"] --> Compliance & Targeting & Creative & Generation & Destinations & Networks & Naming & Budget & Tracking & Funnel
     Audit["ad-audit"] --> Budget
-    Ideation["ad-ideation"] --> Compliance & Targeting & Creative & Budget
+    Ideation["ad-ideation"] --> Funnel & Compliance & Targeting & Creative & Budget
     Intake["ad-intake"] --> Compliance & Creative & Generation
 ```
 
@@ -160,6 +161,37 @@ checks are non-negotiable parts of `ad-setup-loop`'s procedure, not optional fol
   `user_acquisition` table for the network just launched and confirm real rows are landing with
   `utm_term`/`utm_id` populated, not the landing page's hardcoded default. `log-setup` isn't considered
   closed until this has run once against live data.
+
+## `rules/funnel.md` &mdash; the search space, and why it is wider than the creative
+
+Added 2026-08-27, from a standing instruction rather than from a finding. Everything else under
+`rules/` constrains *how* an ad is made; this one widens *what may be proposed at all*.
+
+The women's funnel has exactly one combination running &mdash; **static image &rarr; landing page
+&rarr; Play Store** &mdash; and it is running for historical reasons, not because the alternatives were
+tested and rejected. The file reframes it as a three-axis matrix: **ad format** (static, carousel,
+video) &times; **capture point** (none, on-platform lead form, email on the landing page, phone)
+&times; **follow-up channel** (none, call centre, WhatsApp). The axes mix and match, and an idea list
+that only varies the creative angle inside the running cell has searched one column of that table.
+
+Its second half is the part that changes what a proposal costs. **The friction ladder is not the
+obvious one.** `snap.py` hardcodes `IMAGE` media, a `WEB_VIEW` creative, a `REMOTE_WEBPAGE` ad and a
+`TRAFFIC` objective, so a second static image is the only thing pushable today &mdash; a video is a
+code change, not a different asset through the same pipe, and an on-platform lead form needs a
+different objective, a different ad type and a resource `snap.py` has no call for. Email capture is a
+`pocket-dating-coach` change; WhatsApp appears in neither registry. Since `budget.md`'s
+&#8377;800&ndash;1,200/day floor funds one or two ad sets at a time, the matrix has more testable cells
+than the budget can read at once, which makes the ordering a constraint rather than a preference.
+
+It also fixes two things a proposal would otherwise get wrong. **On-platform lead forms are not
+burned**: they ran and returned 98% male submissions, but `creative-generation.md` attributes that to
+creative POV plus a submit-optimised objective and leaves the format unjudged &mdash; and both causes
+have since changed, so they are a re-run candidate. **A phone field has no consumer**: the call centre
+is blocked on a company that is not registered, so email is the field to test first on `/get/w`.
+
+The file authorises nothing. A cell on that table still passes `compliance.md`, `destinations.yaml`'s
+audience gate, `budget.md`'s floor and `networks.yaml`'s `creation` field. Widening the search space is
+not widening what may ship.
 
 ## Read next
 

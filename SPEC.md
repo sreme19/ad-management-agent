@@ -342,6 +342,10 @@ turn rather than applying the change once and letting it evaporate.
 - `rules/naming.md` — the campaign/ad-set/ad naming convention already in production use.
 - `rules/budget.md` — the ₹50k/month operating budget, the test/exploit/retarget split, minimum viable
   daily spend, and the kill/double rule.
+- `rules/funnel.md` — the funnel as a three-axis matrix (format x capture point x follow-up channel)
+  rather than the one path currently running, plus the friction ladder that orders the untried cells by
+  what each actually costs to build. Added 2026-08-27 from a standing operator instruction; it widens
+  what `ad-ideation` may propose without widening what may ship.
 
 ## Creatives
 

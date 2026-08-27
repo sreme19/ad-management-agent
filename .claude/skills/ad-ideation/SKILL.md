@@ -26,6 +26,11 @@ If the pass answers one of those questions, close it: `ad-agent answer <q-id> --
 
 ## Where to look
 
+- **`rules/funnel.md` first — it defines the search space, and it is wider than creative.** The funnel
+  is a three-axis matrix (ad format x capture point x follow-up channel) and only one cell is running.
+  An idea list that only varies the creative angle inside the running cell has searched one column of
+  that table and is not a finished pass. The file also carries the friction ladder, so an idea can be
+  ranked by what it actually costs to build, and two corrections a proposal must not get wrong.
 - **`rules/creative-style.md`'s "Competitive landscape"** section, plus the Meta Ads Library, Snap's
   public ads library, and Google's Ads Transparency Center — see what Tinder, Bumble, Hinge, Shaadi.com,
   Aisle, TrulyMadly/QuackQuack are actually running right now, not just their stated positioning.
@@ -53,9 +58,13 @@ test spend (`rules/budget.md`'s minimum viable range as the floor), and a plain 
 ## Procedure
 
 1. **`ad-agent open`** — see what is already outstanding before adding to it.
-2. Research broadly — competitor creative, product stories, open hypotheses, ad-audit findings — before
-   narrowing.
-3. **Record what you learned, separately from what you propose.** A durable claim about the world is a
+2. **Read `rules/funnel.md`** — the matrix and the friction ladder. Ideas are drawn from that space,
+   not just from the creative axis, and the ladder is what makes an estimated spend honest: a rung-1
+   idea needs a `snap.py` change before a rupee can be spent, and an idea that does not say so has
+   understated its cost.
+3. Research broadly — competitor creative, product stories, open hypotheses, ad-audit findings, and
+   the untried cells of the funnel matrix — before narrowing.
+4. **Record what you learned, separately from what you propose.** A durable claim about the world is a
    learning; a thing to try is an idea. They have different lifetimes and the distinction is what makes
    the library usable later:
    ```
@@ -67,10 +76,10 @@ test spend (`rules/budget.md`'s minimum viable range as the floor), and a plain 
    `source-code` may be `high`; a competitor observation or an informed hunch caps at `medium`, however
    plausible it feels. A `live-data` claim needs `--sample-n` and can only be `low` below
    `MIN_SAMPLE = 30`. Don't reach for a source kind that fits the confidence you want.
-4. For each idea worth writing up: name the persona/audience, the emotional hook or product story it's
+5. For each idea worth writing up: name the persona/audience, the emotional hook or product story it's
    built on, why this and why now, an estimated daily spend to test it, and a compliance check against
    `rules/compliance.md`.
-5. Give each a verdict: `recommend` or `hold`, and **write it down**:
+6. Give each a verdict: `recommend` or `hold`, and **write it down**:
    ```
    ad-agent idea --title "..." --verdict recommend|hold --network <key from rules/networks.yaml> \
      --persona <from rules/targeting.md> --est-daily <INR> --est-days <n> --rationale "..." \
@@ -79,10 +88,10 @@ test spend (`rules/budget.md`'s minimum viable range as the floor), and a plain 
    A `hold` **must** state `--blocked-on`: what would have to be true for it to become recommendable.
    The command refuses without it, because a hold with no unblock condition is indistinguishable from a
    no and will sit in the queue forever.
-6. **Cite only the learnings the test actually bears on.** `--learning` is not a bibliography. When the
+7. **Cite only the learnings the test actually bears on.** `--learning` is not a bibliography. When the
    campaign returns a verdict, `log-review` applies it to every learning the idea lists — so naming a
    claim this test will not vary marks it on evidence it did not produce.
-7. Present the list to the user plainly, ranked by conviction, not just chronologically.
+8. Present the list to the user plainly, ranked by conviction, not just chronologically.
 
 ## What is not an idea
 

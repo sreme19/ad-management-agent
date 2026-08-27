@@ -26,6 +26,11 @@ These are the actual product rules, and they may have been refined since you las
 - `rules/creative-generation.md` — how an asset actually gets produced: the POV rule, the Grok Imagine
   prompt skeleton, the standing negative list, the plate/type split, and the QA gate every asset passes
   before it can be referenced by a proposal.
+- `rules/funnel.md` — the three-axis funnel matrix and the friction ladder. Read it before promising
+  a format: `snap-push` can build a static image into a web-view traffic ad and **nothing else**, so an
+  approved idea calling for carousel, video or an on-platform lead form needs a `snap.py` change first.
+  Say that up front rather than discovering it at push time. It also records that a phone field has no
+  consumer yet and that lead forms are a re-run candidate, not a burned format.
 - `rules/destinations.yaml` — the registry of landing pages and whose point of view each one's copy
   occupies. **This one is enforced in code:** `ad-agent propose` refuses to write a record whose ad-set
   audience doesn't match its destination's framing, and there is no override flag. Read it before
