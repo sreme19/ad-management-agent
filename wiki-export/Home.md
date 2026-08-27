@@ -21,7 +21,7 @@ flowchart LR
 
     subgraph Setup["Recommending a new ad"]
         S1["Names, targeting, creative, budget\n(ad-setup-loop)"]
-        S2(["Created on Snap, PAUSED\n(snap-push) — or by hand on Meta"])
+        S2(["Created PAUSED on Snap or Meta\n(snap-push / meta-push)"])
         S3(["You enable it in Ads Manager"])
     end
 
