@@ -1,10 +1,34 @@
-"""Web-ready imagery for /get/w, cut from plates this repo already approved.
+"""Web-ready imagery for /get/w, cut from the current winning plates.
 
     uv run python creatives/_web/prep-get-w-images.py
 
 Writes into pocket-dating-coach/static/get-w/. That repo holds the page; this one
 holds the plates and the rules they were made under, so the derivation lives here
 and only the output crosses over. Re-run to re-cut.
+
+ROUND 2 (2026-08-27, Sree: "the images are not the best", Bumble as reference).
+The round-1 cuts read static: every frame in the Bumble reference set catches
+someone mid-motion or mid-laugh, and ours held still. Three new Gemini plates from
+`_bakeoff/round-02-getw-bumble/candidates/` replace them:
+
+  hero.jpg      <- gemini-hero-1.png   she laughs, head tipped, eyes creased
+  moment.jpg    <- gemini-moment-1.png mid-step on a Bangalore street, glancing
+                   back laughing (replaces phone-down.jpg on the page)
+  shortlist.jpg <- gemini-phones-1.png three overlapping phones on cream, the
+                   shortlist UI composited into the CENTRE one
+
+WATERMARK HANDLING, per plate. Gemini stamps a translucent star bottom-right.
+  hero:   star at (775-815, 1055-1100) -> bottom crop at y=1050 drops it; the cut
+          lands mid-forearm, which is an ordinary editorial crop.
+  moment: star at (790-830, 1030-1075) -> right crop at x=760 drops it, and the
+          same cut removes the garbled background signage and the two distant
+          background figures. One crop, three QA notes closed.
+  phones: star at (785-850, 990-1060) on FLAT cream -> covered with a solid patch
+          sampled from the surrounding background. Same operation as the ad's
+          cream scrim (a solid over the mark, no generated detail), just local.
+
+The round-1 derivation below is kept callable for provenance — the shipped
+2026-08-27 morning images came from it.
 
 THREE PLATES, ALL ALREADY THROUGH THE WOMEN'S LANE:
 
@@ -159,15 +183,63 @@ def perspective_coeffs(dst_quad, src_size):
     return solve8(a, b)
 
 
-def find_screen_quad(im):
-    """The blank screen, by threshold. Pure white is the screen and only the screen."""
+def is_screen_white(rgb):
+    """Bright AND neutral. The round-2 plate's screens render at ~(239,239,239),
+    below the 250 threshold the round-1 plate satisfied — but they are perfectly
+    neutral (max-min spread 0) where the cream ground is warm (spread 23+), so
+    chroma separates them cleanly where brightness alone no longer does."""
+    r, g, b = rgb
+    # 215/12 rather than 225/8: the screen's edge pixels pick up a slight warm
+    # reflection near the bezel and were failing the tighter test, which left a
+    # sliver of original white outside the composite along the lower-right edge.
+    # The ground sits at spread 23+, so 12 still separates cleanly.
+    return min(r, g, b) >= 215 and max(r, g, b) - min(r, g, b) <= 12
+
+
+def flood_white(im, seed):
+    """Every screen-white pixel 4-connected to `seed`.
+
+    A rectangular window is not enough on the round-2 phones plate: the three
+    screens are all pure white and the tilted side screens poke into any box drawn
+    around the centre one — the first cut of this warped the UI against a quad
+    whose top-left corner belonged to the LEFT phone, and nothing visible landed.
+    Connectivity is the property that actually distinguishes the centre screen,
+    because the black bezels separate the white regions completely.
+    """
     px = im.load()
-    pts = [
-        (x, y)
-        for y in range(im.height)
-        for x in range(im.width)
-        if px[x, y][0] >= 250 and px[x, y][1] >= 250 and px[x, y][2] >= 250
-    ]
+    W, H = im.size
+    seen = set()
+    stack = [seed]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen or not (0 <= x < W and 0 <= y < H):
+            continue
+        if not is_screen_white(px[x, y]):
+            continue
+        seen.add((x, y))
+        stack.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    if not seen:
+        raise SystemExit(f"no white region at seed {seed} — has the plate changed?")
+    return seen
+
+
+def find_screen_quad(im, seed=None):
+    """The blank screen, by threshold. Pure white is the screen and only the screen.
+
+    With `seed`, only the white region connected to that point counts — see
+    flood_white. Without it, every pure-white pixel in the frame does (the round-1
+    plate had exactly one white region, so that was enough there).
+    """
+    if seed is not None:
+        pts = list(flood_white(im, seed))
+    else:
+        px = im.load()
+        pts = [
+            (x, y)
+            for y in range(im.height)
+            for x in range(im.width)
+            if px[x, y][0] >= 250 and px[x, y][1] >= 250 and px[x, y][2] >= 250
+        ]
     if not pts:
         raise SystemExit("no blank screen found in the plate — has it been re-cut?")
     return (
@@ -190,8 +262,22 @@ def grow(quad, px_out):
     return out
 
 
-def composite_screen(plate, ui):
-    quad = find_screen_quad(plate)
+def composite_screen(plate, ui, seed=None):
+    if seed is not None:
+        # Warp to the flood region's axis-aligned BOUNDING BOX, not the
+        # extreme-corner quad. The screen has rounded corners, so its straight
+        # quad bottom runs ABOVE the bottom bulge of the white region — mask
+        # pixels below that line sampled outside the UI source and came back
+        # black, which printed a row of dark dashes along the screen foot. The
+        # bbox covers every flooded pixel by construction; the centre phone is
+        # near enough axis-aligned that losing the ~5px tilt is invisible.
+        screen = flood_white(plate, seed)
+        xs = [pt[0] for pt in screen]
+        ys = [pt[1] for pt in screen]
+        quad = ((min(xs), min(ys)), (max(xs), min(ys)), (max(xs), max(ys)), (min(xs), max(ys)))
+    else:
+        quad = find_screen_quad(plate)
+        screen = None
 
     # Grow the quad slightly and warp to THAT. Two problems are solved at once: the
     # quad is four straight lines through the extreme points, so it cuts the corners
@@ -200,7 +286,7 @@ def composite_screen(plate, ui):
     # past the edge of the source and lands black. Growing the target fixes the
     # slivers and keeps every masked pixel inside the source. The UI scales up by
     # about two percent, which the render's own margins absorb.
-    big = grow(quad, 5)
+    big = grow(quad, 9)
     warped = ui.transform(
         plate.size, Image.PERSPECTIVE, perspective_coeffs(big, ui.size), Image.BICUBIC
     )
@@ -213,12 +299,17 @@ def composite_screen(plate, ui):
     px = plate.load()
     mask = Image.new("L", plate.size, 0)
     mpx = mask.load()
-    for y in range(plate.height):
-        for x in range(plate.width):
-            r, g, b = px[x, y]
-            if r >= 245 and g >= 245 and b >= 245:
-                mpx[x, y] = 255
-    mask = mask.filter(ImageFilter.MaxFilter(3))
+    if screen is not None:
+        # Exactly the connected screen region, nothing else.
+        for x, y in screen:
+            mpx[x, y] = 255
+    else:
+        for y in range(plate.height):
+            for x in range(plate.width):
+                r, g, b = px[x, y]
+                if r >= 245 and g >= 245 and b >= 245:
+                    mpx[x, y] = 255
+    mask = mask.filter(ImageFilter.MaxFilter(5))
 
     region = Image.new("L", plate.size, 0)
     ImageDraw.Draw(region).polygon([(round(x), round(y)) for x, y in big], fill=255)
@@ -229,7 +320,65 @@ def composite_screen(plate, ui):
     return out, quad
 
 
+def cover_solid(im, box):
+    """Patch over a mark on a near-uniform ground.
+
+    The fill is the average of the pixels in a ring just outside the box — a
+    single sampled pixel left a visible rectangle, because the cream ground
+    carries a soft gradient and no one pixel matches the whole neighbourhood.
+    Averaged, the patch sits inside JPEG noise.
+    """
+    l, t, r, b = box
+    px = im.load()
+    ring = []
+    for x in range(max(0, l - 8), min(im.width, r + 8)):
+        for y in (max(0, t - 8), min(im.height - 1, b + 7)):
+            ring.append(px[x, y])
+    for y in range(max(0, t - 8), min(im.height, b + 8)):
+        for x in (max(0, l - 8), min(im.width - 1, r + 7)):
+            ring.append(px[x, y])
+    # Only warm ground pixels vote: the ring can graze a phone bezel or screen,
+    # and averaging those in produced a visibly grey patch on the cream.
+    warm = [c for c in ring if max(c) - min(c) >= 15 and min(c) >= 150]
+    ring = warm or ring
+    n = len(ring)
+    fill = tuple(sum(c[i] for c in ring) // n for i in range(3))
+    ImageDraw.Draw(im).rectangle(box, fill=fill)
+    return im
+
+
+R2 = SRC / "_bakeoff/round-02-getw-bumble/candidates"
+
+
 def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    # Hero — bottom crop at 1050 drops the watermark; cut lands mid-forearm.
+    hero = Image.open(R2 / "gemini-hero-1.png").convert("RGB")
+    hero.crop((0, 0, 896, 1050)).save(OUT / "hero.jpg", **JPEG)
+
+    # Moment — right crop at 760 drops watermark, garbled signage and the two
+    # distant background figures in one cut.
+    moment = Image.open(R2 / "gemini-moment-1.png").convert("RGB")
+    moment.crop((0, 0, 760, 1152)).save(OUT / "moment.jpg", **JPEG)
+
+    # Shortlist — composite the UI into the CENTRE phone (the flood seed keeps
+    # the side screens out), then crop the bottom at 970: the watermark star sits
+    # at y990-1060, so the crop removes it outright and no cover patch is needed.
+    # The right phone bleeding off the cut edge matches the reference frames.
+    phones = Image.open(R2 / "gemini-phones-1.png").convert("RGB")
+    composed, quad = composite_screen(phones, shortlist_render(), seed=(460, 580))
+    composed.crop((0, 0, 928, 970)).save(OUT / "shortlist.jpg", **JPEG)
+
+    for name in ("hero.jpg", "moment.jpg", "shortlist.jpg"):
+        f = OUT / name
+        im = Image.open(f)
+        print(f"{name:14} {im.size[0]}x{im.size[1]}  {f.stat().st_size // 1024} KB")
+    print("centre-screen quad:", quad)
+
+
+def main_r1():
+    """Round-1 derivation, kept for provenance. Produced the 2026-08-27 morning set."""
     OUT.mkdir(parents=True, exist_ok=True)
 
     # Hero — 3:4 above the watermark line, framed on her face with headroom.
@@ -244,11 +393,6 @@ def main():
     b = Image.open(SRC / "fourteen-suitors-w1822/clean-b.jpg").convert("RGB")
     composed, quad = composite_screen(b, shortlist_render())
     crop_ratio(composed, 300, 1350).save(OUT / "shortlist.jpg", **JPEG)
-
-    for p in ("hero.jpg", "phone-down.jpg", "shortlist.jpg"):
-        f = OUT / p
-        print(f"{p:16} {Image.open(f).size[0]}x{Image.open(f).size[1]}  {f.stat().st_size // 1024} KB")
-    print("screen quad:", quad)
 
 
 if __name__ == "__main__":
