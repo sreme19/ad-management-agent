@@ -355,10 +355,12 @@ tying an asset to the `rec_id`/`ad_id` that used it.
 - The `ads_agent_ro` read-only Postgres role (decision #7, channel 2) — not created yet.
 - A CSV/xlsx export of the ledger for ad hoc spreadsheet use — deferred until `dump-ledger`'s plain-text
   table proves insufficient.
-- CI. `pytest tests/` and `ruff check .` both run locally (`src/` and `tests/` carry six pre-existing
-  style findings between them, in line with the rest of the portfolio), but nothing runs them
-  automatically. `ad-agent commands --check` is the piece most worth wiring first, since documentation
-  drift is the failure that has actually happened here.
+- ~~CI~~ — **done 2026-08-26**, `.github/workflows/checks.yml`. Runs `commands --check`, a staleness
+  check on the generated command list, `pytest`, and `ruff` on push and PR. Ordered by what has
+  actually gone wrong here rather than by convention: documentation drift is the failure with a real
+  incident behind it, so it runs first. `src/` and `tests/` are now lint-clean, with one documented
+  `noqa` — `date.today()` is deliberate, because every date this repo writes is an IST business date
+  read alongside analytics that bucket by IST day.
 - A Claude Code scheduled task for `ad-audit` — deferred until it's been run by hand enough times to
   trust unattended (decision #2).
 - The eventual Claude Code plugin that "steers implementation" of `ad-setup-loop`'s output directly in

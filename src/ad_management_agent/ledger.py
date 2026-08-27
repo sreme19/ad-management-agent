@@ -19,7 +19,7 @@ import yaml
 STATUSES = ("proposed", "executing", "live", "reviewed", "abandoned")
 VERDICTS = ("working", "not-working", "inconclusive")
 
-_FRONT_MATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.S)
+_FRONT_MATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.DOTALL)
 
 
 def slugify(text: str) -> str:
@@ -50,7 +50,7 @@ class Record:
         self.path.write_text(f"---\n{fm}\n---\n{self.body}", encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> "Record":
+    def load(cls, path: Path) -> Record:
         text = path.read_text(encoding="utf-8")
         m = _FRONT_MATTER_RE.match(text)
         if not m:

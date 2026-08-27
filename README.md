@@ -283,7 +283,11 @@ the environment — `uv run ad-agent <command>` works with no install step at al
 ```
 pip install -e ".[dev]" && pytest tests/ -q     # or: uv run --extra dev pytest tests/ -q
 ruff check .                                    # or: uv run --extra dev ruff check .
+ad-agent commands --check                       # docs and skills still match the CLI
 ```
+
+All three run on every push and pull request via `.github/workflows/checks.yml`, plus a staleness check
+on the generated command list.
 
 The suite covers the promises this repo makes in prose, on the principle that a rule stated only in a
 docstring is not a rule:

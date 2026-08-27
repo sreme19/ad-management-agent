@@ -16,14 +16,26 @@ import urllib.request
 from pathlib import Path
 
 from . import budget as budgetrules
-from . import destinations, networks as networkreg, research as researchmod
-from . import snap as snapapi, targeting as targetingspec
+from . import destinations
+from . import networks as networkreg
+from . import research as researchmod
+from . import snap as snapapi
+from . import targeting as targetingspec
 from .config import load_config
 from .ledger import STATUSES, Ledger
 
 
 def _today() -> str:
-    return _dt.date.today().isoformat()
+    """Today in the machine's local timezone, deliberately.
+
+    Every date this repo writes is a business date read alongside
+    pocket-dating-coach's analytics, which bucket by IST day (`fetch-analytics`
+    takes `--start`/`--end` as IST days). A UTC date would disagree with those
+    buckets for five and a half hours out of every twenty-four, which is exactly
+    the window an evening review happens in. ruff's DTZ011 is right in general and
+    wrong here.
+    """
+    return _dt.date.today().isoformat()  # noqa: DTZ011 — IST business date, see above
 
 
 def _check_network(rules_dir: Path, network: str) -> None:

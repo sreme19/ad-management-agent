@@ -1,0 +1,62 @@
+# Run the checks that have actually caught something in this repo.
+#
+# Ordered by what has gone wrong here, not by convention. Documentation drift is
+# the failure that has really happened: on 2026-08-26 both README.md and the wiki
+# still said this agent never calls a Snap API, hours after it had created a live
+# ad set through one, and neither listed `snap-push` at all. `commands --check`
+# catches that, and the same command now catches a skill naming a command that
+# does not exist — which fails mid-task in front of the user rather than merely
+# reading wrong.
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --extra dev
+
+      # First, because it is the check with a real incident behind it.
+      - name: Docs and skills match the CLI
+        run: uv run ad-agent commands --check
+
+      - name: The generated command list is up to date
+        run: |
+          uv run ad-agent commands --write
+          if ! git diff --quiet -- README.md wiki-export/Command-Cheatsheet.md; then
+            echo "::error::The command list is stale. Run 'ad-agent commands --write' and commit."
+            git --no-pager diff -- README.md wiki-export/Command-Cheatsheet.md
+            exit 1
+          fi
+
+      - name: Tests
+        run: uv run --extra dev pytest tests/ -q
+
+      - name: Lint
+        run: uv run --extra dev ruff check src/ tests/
+
+# Deliberately no grep for an enabling status in src/. The obvious version of that
+# check matches the docstring in snap.py that *documents* the guard, and a check
+# that cries wolf is a check someone eventually deletes. tests/test_snap_safety.py
+# owns this properly: it asserts every enabling spelling is refused at every
+# nesting depth, that the real create paths still pass, and that a refused request
+# never reaches the network.
