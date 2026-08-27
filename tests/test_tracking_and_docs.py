@@ -47,12 +47,26 @@ class TestUtmUrl:
         assert urlsplit(self.url()).path == "/get/w"
 
     def test_meta_puts_the_ad_id_where_meta_reads_it(self):
-        # traffic-quality.ts reads utm_content as the ad-level id on Meta and
-        # utm_id on Snap. Writing the ad *name* into utm_content, as the single
-        # template in tracking.md literally shows, would break the Meta join.
+        # CONFIRMED against pocket-dating-coach source on 2026-08-27, not inferred:
+        # adSetKeyOf reads `adId = network === 'meta' ? clean(raw.utm_content)`. So
+        # utm_content IS the ad id on Meta, tracking.md's prose was right and its
+        # single template was wrong, and q-2026-08-26-utm-content-on-meta is closed.
         q = parse_qs(urlsplit(self.url("meta")).query)
         assert q["utm_content"] == ["ad-uuid"]
-        assert q["utm_source"] == ["meta"]
+
+    def test_metas_source_is_fb_because_meta_classifies_as_other(self):
+        # The registry said `meta` until 2026-08-27, and it would have silently
+        # broken every Meta metric: networkOf() maps only ig/fb/instagram/facebook
+        # to 'meta', so `meta` fell through to 'other'. Asserted as a value rather
+        # than left to the registry alone, because this is the snap/snapchat class
+        # of bug — invisible until the numbers make no sense.
+        assert parse_qs(urlsplit(self.url("meta")).query)["utm_source"] == ["fb"]
+
+    def test_neither_network_emits_an_unresolved_macro(self):
+        # adSetKeyOf rejects any value containing '{{' as absent, so a macro that
+        # did not resolve joins to nothing. Every value here is written literally.
+        for network in ("snap", "meta"):
+            assert "{{" not in self.url(network)
 
     def test_snap_keeps_both_the_id_and_the_readable_name(self):
         q = parse_qs(urlsplit(self.url("snap")).query)

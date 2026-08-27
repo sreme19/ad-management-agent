@@ -68,7 +68,26 @@ networks:
 
   meta:
     label: Meta
-    utm_source: meta
+    # `fb`, NOT `meta`. Settled 2026-08-27 by reading pocket-dating-coach's
+    # traffic-quality.ts rather than guessing: networkOf() maps only ig/fb/
+    # instagram/facebook to 'meta', so utm_source=meta fell through to 'other' and
+    # every Meta click would have been classified as non-ad traffic. Its own
+    # docstring says why — "utm_source is the PLACEMENT on Meta: real traffic
+    # arrives as `ig` or `fb`, never as `meta`" — and lead-source.test.ts carries a
+    # real row shaped { utm_source: 'fb', utm_campaign: '6978749199681' }.
+    #
+    # This registry declared `meta` from the day it was written, and it was never
+    # exercised because no Meta ad here has ever carried UTMs at all
+    # (lrn-2026-08-27-meta-ads-carry-no-utms). meta-push would have been the first,
+    # which is exactly how the snap/snapchat mismatch happened — 7 of 151 signups
+    # joinable. Caught before the first push instead of after.
+    #
+    # A literal loses placement granularity: Meta's own {{site_source_name}} macro
+    # resolves to fb/ig per impression. A literal is chosen anyway, because an
+    # unresolved macro cost a week of unattributable spend on 2026-08-21, and
+    # networkOf treats fb and ig identically — so the network join is unaffected and
+    # only the fb-vs-ig split is lost. See q-2026-08-27-meta-placement-granularity.
+    utm_source: fb
     ad_join_param: utm_content
     ad_set_join_param: utm_term
     creation: paused-only

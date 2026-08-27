@@ -31,7 +31,42 @@ parameter to put it in was pointing at the wrong one for Snap.
 ## The URL every ad must carry — non-negotiable, checked before launch
 
 ```
-https://www.riteangle.dating/get?utm_source={snapchat|meta}&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_term={{adSet.id}}&utm_id={{ad.id}}&utm_content={{ad.name}}
+https://www.riteangle.dating/get?utm_source={snapchat|fb}&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_term={{adSet.id}}&utm_id={{ad.id}}&utm_content={{ad.name}}
+```
+
+**Corrected 2026-08-27, twice, by reading `pocket-dating-coach/src/lib/server/traffic-quality.ts`
+instead of reasoning about it. Both errors were in the template above.**
+
+1. **`utm_source` on Meta is `fb`, never `meta`.** `networkOf()` maps only
+   `ig`/`fb`/`instagram`/`facebook` to `'meta'`; anything else falls through to `'other'`. Its own
+   docstring: *"utm_source is the PLACEMENT on Meta — real traffic arrives as `ig` or `fb`, never as
+   `meta`"*. `rules/networks.yaml` had declared `meta` since it was written, and it had never been
+   exercised because no Meta ad here has ever carried UTMs at all. This closes
+   `q-2026-08-27-meta-utm-source-spelling`.
+
+2. **`utm_content` carries the ad ID on Meta, and the ad NAME on Snap.** The template above shows
+   `utm_content={{ad.name}}` for both, which is right for Snap and breaks the Meta join.
+   `adSetKeyOf()` reads `adId = network === 'meta' ? clean(raw.utm_content)`. Snap has both
+   parameters available — `utm_id` for the id, `utm_content` for the readable name — so it keeps
+   both; Meta has to spend `utm_content` on the id. This closes
+   `q-2026-08-26-utm-content-on-meta` in favour of the prose, which is what `networks.utm_params`
+   already implemented.
+
+**Per-network, as actually read by the consumer:**
+
+| Parameter | Snap | Meta |
+|---|---|---|
+| `utm_source` | `snapchat` | **`fb`** |
+| `utm_term` | ad set id (UUID; shape-tested) | ad set id (numeric) |
+| ad-level id | `utm_id` (Snap appends it itself) | **`utm_content`** |
+| `utm_content` | ad name, human-readable | *unavailable — spent on the ad id* |
+| `utm_campaign` | ad set NAME, not campaign name | see `q-2026-08-27-meta-utm-campaign-name-or-id` |
+
+Any value containing `{{` is treated as absent by `adSetKeyOf`, so an unresolved macro joins to
+nothing rather than to something wrong. `snap-push` and `meta-push` both write every value
+literally for that reason — the ids are known facts by the time the URL is set.
+
+```
 ```
 
 - **`utm_id={{ad.id}}` is mandatory on Snap, set explicitly on the ad's own Website URL field.** Do not
