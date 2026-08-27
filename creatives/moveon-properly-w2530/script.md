@@ -1,5 +1,24 @@
 # Testimonial script + shot list — MOVE-ON-PROPER, women 25–30
 
+> ## ⛔ BLOCKED as written — 2026-08-28
+>
+> Not a style note. `rules/compliance.md` §6.2, as scoped by the app owner on
+> 2026-08-28: **a generated person may not narrate a first-person experience of using
+> Riteangle.** The 7–12s line — "Yahan har koi verified hai. He's vetted before he ever
+> reaches me — main scroll nahi karti" — is exactly that, and the 0–3s and 3–7s lines
+> are first-person too. Spoken by an AI-generated woman it is a fabricated customer
+> testimonial, and no watermark or labelling decision makes that acceptable.
+>
+> Two ways to unblock, both fine:
+> 1. **Cast a real person.** The script needs no changes — the prohibition is on a
+>    *synthetic* person making the claim, not on the claim.
+> 2. **Rewrite out of first person.** Keep the hook as a general statement, the way the
+>    still does ("Move on toh karna hai — par dhang se." passes and is on the live ad).
+>
+> The still in this folder is unaffected and went live on Meta on 2026-08-28
+> (ad `6984036525881`).
+
+
 The face-forward, "Tinder-level" version of this hook. Governed by
 `rules/creative-generation.md` (POV §1, palette §5, safe areas §7) and
 `rules/compliance.md` (§6). Reference: Tinder's Move On Salon — a woman

@@ -66,7 +66,9 @@ finished asset against `rules/compliance.md` before handoff") and required by
 `rules/compliance.md` §8. Done by reading the rendered `asset-c5-a.jpg` itself, not the
 notes about it.
 
-**Verdict: `escalate` — one item for the app owner. Everything else confirmed clean.**
+**Verdict: `pass` — resolved 2026-08-28. Originally returned `escalate` on §6.2; the app
+owner settled the scope and this asset clears it. History kept below rather than
+overwritten, because the reasoning is what the next asset needs.**
 
 | Rule | Independent finding |
 |---|---|
@@ -78,9 +80,35 @@ notes about it.
 | §6.1 man's real photo | **Confirmed clean.** No man in frame. Three framed pictures on the walls; the right-hand one is abstract, the others are blurred beyond any identifiable face. |
 | §6.3 18+ | **Confirmed clean.** Subject reads clearly late-20s. |
 | §6.4 banned vocabulary | **Confirmed** — re-read the three pattern arrays against the burned-in type independently. 0 hits. |
-| **§6.2 label AI imagery** | **ESCALATE — see below.** |
+| **§6.2 label AI imagery** | **Pass**, per the scope decision of 2026-08-28 now written into `rules/compliance.md` §6.2. Reasoning below. |
 
-### §6.2 — the one item, and why it is a decision rather than an edit
+### §6.2 — RESOLVED 2026-08-28 by the app owner
+
+The scope is now written into `rules/compliance.md` §6.2 so no future asset re-argues it.
+The line drawn is about the **claim, not the pixels**:
+
+- A generated person MAY appear in Riteangle creative — photorealistic, unlabelled.
+- A generated person MAY NOT narrate a first-person experience of using Riteangle.
+- The labelling sentence in §6.2 is an in-product obligation; paid social owes only
+  "no visible AI-tool watermark", no glitches, and no false claim.
+
+**This still passes.** Its burned-in copy is "Move on toh karna hai — par dhang se."
+and "Verified, not vibes." Neither claims she personally used the product — "karna hai"
+is general, not "I did". A face plus an aphorism is ordinary advertising imagery.
+
+**One correction to the original escalation below.** It leaned on `script.md` to argue
+implied testimony, but `script.md` is the VIDEO cut, not this asset. The still never
+carried the first-person lines the escalation quoted. The concern was real about the
+video and overstated about the still.
+
+**`script.md` is now blocked** under the same rule — see the notice at the top of that
+file. Its 7-12s line, "Yahan har koi verified hai. He's vetted before he ever reaches
+me — main scroll nahi karti", spoken by a synthetic woman, is exactly the prohibited
+form. Cast a real person, or rewrite out of first person.
+
+Original escalation, kept for the reasoning:
+
+### §6.2 — the one item, and why it was raised
 
 `rules/compliance.md` §6.2 opens with **"Label AI imagery"** and adds that creative
 showing a portrait "must not imply it's an untouched snapshot". The gate above marked

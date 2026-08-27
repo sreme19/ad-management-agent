@@ -1,13 +1,13 @@
 ---
 rec_id: rec-2026-08-27-moveon-w2530-meta
 network: meta
-status: proposed
+status: live
 campaign_name: RA_TRAFFIC_GETW_IN_BLR_TOF_202608
 ad_set_name: WOMEN_25-30_CASUAL_MOVEON-LPV
 ad_name: STORY_MOVE-ON-PROPER_A_20260827
-campaign_id: null
-ad_set_id: null
-ad_id: null
+campaign_id: '6984035763681'
+ad_set_id: '6984035818681'
+ad_id: '6984036525881'
 targeting_summary: "Women 25-30, Bangalore, Advantage Audience off. CASUAL-SELECTIVE\
   \ persona \u2014 the security-register end of the 18-28 band per the Aug-5 age split.\
   \ The breakup re-entry hook (MOVE-ON-PROPER thread): moving on is not in question,\
@@ -32,6 +32,7 @@ last_note: '2026-08-28'
 campaign_daily_cap_inr: null
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-28'
+executed: '2026-08-28'
 ---
 
 ## Brief (proposed)
@@ -106,3 +107,14 @@ No comment-moderation policy exists for the hostility a public breakup hook attr
 ## Note — incident (2026-08-28)
 
 Pushed to Meta PAUSED on 2026-08-28 and read back clean, 13/13 fields matching. Real ids: campaign 6984035763681, ad set 6984035818681, ad 6984036525881, tracked creative 3381749368661464. url_tags on the creative carry literal values with no macro: utm_source=fb, utm_term=6984035818681 (ad set id), utm_content=6984036525881 (ad id, which is what traffic-quality.ts joins on for Meta). Advantage Audience read back 0, so the 25-30 band held and was not silently broadened. All 83 creative enhancement features report OPT_OUT, so the QA-passed asset is intact. HOUSEKEEPING: the push took four attempts and left orphaned untracked creatives behind (1812181563532325, 3546135838888885, 982834978110685) plus duplicate uploaded images. All unused and costing nothing; meta.py cannot delete them by design, so remove them by hand in Ads Manager if the clutter matters.
+
+## Execution
+
+- Date: 2026-08-28
+- Campaign ID: 6984035763681
+- Ad set ID: 6984035818681
+- Ad ID: 6984036525881
+
+## Note — creative (2026-08-28)
+
+COMPLIANCE ESCALATION RESOLVED 2026-08-28 by the app owner. The §6.2 AI-labelling question is settled and the scope is written into rules/compliance.md §6.2 rather than left as an inference. The line is about the claim, not the pixels: a generated person MAY appear in Riteangle creative, photorealistic and unlabelled; a generated person MAY NOT narrate a first-person experience of using Riteangle. The labelling sentence in §6.2 is an in-product obligation, and paid social owes only no-visible-AI-tool-watermark, no glitches, no false claim. This still passes on that test — its copy is a general aphorism, not a personal-results claim. Correction to the original escalation: it leaned on script.md, which is the VIDEO cut, and the still never carried those first-person lines; the concern was right about the video and overstated about the still. script.md is now blocked at the top of the file under the same rule. Independent of all this, Meta and Snap carry their own synthetic-media disclosure rules for ads, which bind separately and have not been checked.

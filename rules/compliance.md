@@ -52,6 +52,31 @@ literal, disclosed, first-party stat — see `creative-style.md` for what's actu
    Creative showing a portrait must not imply it's an untouched snapshot. (Sree's Aug 21 note: "No grok
    label," "Image itself should not have AI glitches," "Indian models" — the generated creative needs to
    look clean and Indian-context-appropriate, not carry a visible AI-tool watermark.)
+
+   **Scope for paid social, decided by the app owner 2026-08-28.** The two sentences above pull in
+   opposite directions on a generated portrait — remove the tool watermark and the image reads *more*
+   like an untouched photograph, not less. That ambiguity was scored inconsistently on
+   `creatives/moveon-properly-w2530` (the finished-asset gate marked §6.2 `pass` for covering the Gemini
+   watermark; the §8 independent pass returned `escalate` for the same asset being unlabelled). It is
+   settled here so no future asset re-argues it:
+
+   - **The labelling obligation in sentence one is an in-product obligation.** A paid-social asset does
+     not need an on-asset "AI-generated" mark. What it owes is sentence two: no visible AI-tool
+     watermark, no AI glitches, and nothing that makes a false claim.
+   - **A generated person MAY appear in Riteangle creative.** Photorealistic, unlabelled, addressing
+     camera. That is ordinary advertising imagery.
+   - **A generated person MAY NOT narrate a first-person experience of using Riteangle.** This is the
+     actual line, and it is about the *claim*, not the pixels. "Move on toh karna hai — par dhang se."
+     is a general statement and is fine. "Yahan har koi verified hai — main scroll nahi karti" spoken by
+     a synthetic woman is a fabricated customer testimonial, and no watermark decision makes that
+     acceptable. Copy in her voice about her own results is the trigger; a face is not.
+   - **Consequence, recorded so it is not rediscovered:** the MOVE-ON-PROPER *still* is compliant and
+     was cleared to enable. The MOVE-ON-PROPER *video* script in that same folder is **blocked** under
+     this rule, because its 7-12s line is exactly the prohibited form. Casting a real person, or
+     rewriting those lines out of first person, unblocks it.
+   - **This scope is about `rules/compliance.md` only.** Meta and Snap each carry their own
+     synthetic-media disclosure rules for ads, which bind independently and have not been checked here.
+     A platform requirement to disclose AI imagery overrides this scope; it does not conflict with it.
 3. **Eighteen and over, without exception.** Confirmed at verification; Snap's dating category carries
    its own 18+ and content restrictions on top of this.
 4. **Run the copy through the banned-vocabulary gate** (or its wordlist, manually, until this repo has
