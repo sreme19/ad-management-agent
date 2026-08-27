@@ -195,3 +195,52 @@ class TestMoneyIsInTheRightUnit:
         # Meta auto-upgrades unpinned callers since 2026-07-29, and versions expire.
         assert metaapi.API_VERSION.startswith("v")
         assert metaapi.API.endswith(metaapi.API_VERSION)
+
+
+class TestTheAccountsOwnConventionNotSnaps:
+    """Corrections made 2026-08-27 after reading the live account, not the docs.
+
+    The first cut of meta.py mirrored snap.py's pixel requirement and asserted "Meta
+    has no fallback, no pixel means no signal at all". The account says otherwise: its
+    live LANDING_PAGE_VIEWS ad set FB_W_20-25_ID_Romantic binds no dataset at ad-set
+    level, has Website events unchecked, and its ad reported 36 landing-page views.
+    Meta binds the dataset at the ACCOUNT level. These tests keep the correction from
+    being quietly re-broken by someone tidying it back into symmetry with Snap.
+    """
+
+    def sig(self):
+        import inspect
+        return inspect.signature(metaapi.MetaClient.create_adset)
+
+    def test_pixel_id_is_optional(self):
+        assert self.sig().parameters["pixel_id"].default is None, (
+            "pixel_id must stay optional: the account's own live LPV ad set has none"
+        )
+
+    def test_the_adset_payload_does_not_send_promoted_object(self):
+        # promoted_object carrying a pixel belongs to OFFSITE_CONVERSIONS, a different
+        # optimisation goal. Sending it on an OUTCOME_TRAFFIC/LANDING_PAGE_VIEWS ad set
+        # sets a field the account's own working ad set does not set.
+        import inspect
+        src = inspect.getsource(metaapi.MetaClient.create_adset)
+        assert "promoted_object" not in src.split('"""')[-1], (
+            "promoted_object is back in the ad-set payload; a conversions objective "
+            "would need it, but that is a new code path, not this one"
+        )
+
+    def test_landing_page_views_is_still_the_goal(self):
+        # The correction was about the pixel, not about the KPI. The account's live ad
+        # set reads "Maximise number of landing page views", so this must not drift.
+        import inspect
+        assert "LANDING_PAGE_VIEWS" in inspect.getsource(metaapi.MetaClient.create_adset)
+
+    def test_a_non_inr_account_is_still_refused(self, monkeypatch):
+        # Confirmed INR on 2026-08-27 (the ad set's cost goal reads "in Indian Rupee"),
+        # so this check should pass in practice — but it is the guard against a 10,000x
+        # error, so it must still fire for anything else.
+        client = metaapi.MetaClient({"access_token": "x", "ad_account_id": "act_1",
+                                     "page_id": "2"})
+        monkeypatch.setattr(type(client), "currency",
+                            property(lambda self: "USD"))
+        with pytest.raises(metaapi.MetaError, match="not INR"):
+            client.require_inr()

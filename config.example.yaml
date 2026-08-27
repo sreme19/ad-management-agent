@@ -76,8 +76,12 @@ meta:
   # deactivated Page of the same name, so a name lookup would be ambiguous.
   page_id: ""
 
-  # Meta Pixel / dataset. Required for LANDING_PAGE_VIEWS optimisation, and
-  # stricter than Snap: Snap counts landing-page views natively in its in-app
-  # browser, so a pixel-less Snap squad still reported 59 of them. Meta has no
-  # such fallback — no pixel means no signal at all.
+  # Meta Pixel / dataset — OPTIONAL, and currently unused by meta-push.
+  #
+  # Unlike Snap, Meta binds the conversion dataset at the ad-account level rather
+  # than per ad set: the account's live FB_W_20-25_ID_Romantic ad set optimises for
+  # landing-page views with nothing bound here and reported 36 of them anyway
+  # (checked 2026-08-27). So the client neither requires this nor sends a
+  # promoted_object. Kept in the schema because a conversions-objective ad set
+  # WOULD need it, and that is the obvious next thing someone builds.
   pixel_id: ""

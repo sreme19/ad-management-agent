@@ -1,8 +1,8 @@
 ---
 id: idea-2026-08-27-breakup-reentry-second-chapter
-title: 'Breakup re-entry hook, "Move on, properly" (Concept B), Hinglish'
+title: Breakup re-entry hook, "Move on, properly" (Concept B), Hinglish
 verdict: recommend
-status: open
+status: proposed
 network: snap
 persona: CASUAL-SELECTIVE
 est_daily_inr: 1000.0
@@ -13,7 +13,7 @@ learnings:
 - lrn-2026-08-27-tinder-sells-the-breakup
 - lrn-2026-08-27-hinglish-is-shaadis-hook-mechanic
 blocked_on: null
-rec_id: null
+rec_id: rec-2026-08-27-moveon-w2530-meta
 ---
 
 ## Idea
@@ -56,3 +56,7 @@ Hinge reel (note-2026-08-27-three-women-creators-on-dating). This is recorded as
 known risk on the recommendation rather than a blocker, on Sree's instruction to
 proceed. ad-setup-loop and the compliance QA step should surface it again before
 anything is enabled, and the ad must be created PAUSED per the standing rule.
+
+## Proposed (2026-08-27)
+
+Became `rec-2026-08-27-moveon-w2530-meta`.

@@ -413,9 +413,12 @@ it:**
   record's `budget_cap_inr_per_day` &mdash; the number `rules/budget.md`'s floor was checked against
   &mdash; stops describing what gets spent. `--accept-campaign-cap` deliberately does *not* cover this:
   a low cap can be a choice, but a CBO parent means the record cannot mean what it says.
-- **A pixel is mandatory, and more so than on Snap.** Snap counts landing-page views natively by
-  rendering the page in its own in-app browser, which is why a pixel-less Snap squad still reported 59
-  of them on 2026-08-26. Meta has no such fallback: no pixel means the optimisation has nothing to read.
+- **No pixel is required, unlike on Snap &mdash; and this page said the opposite until 2026-08-27.**
+  Meta binds the conversion dataset at the *ad account* level, not the ad set: the account's own live
+  `FB_W_20-25_ID_Romantic` ad set optimises for landing-page views with no dataset bound and Website
+  events unchecked, and its ad reported 36 of them regardless. So `meta-push` neither requires
+  `meta.pixel_id` nor sends a `promoted_object`. A conversions-objective ad set would need one; that is
+  a code path nobody has built.
 - **A non-INR ad account is refused.** Meta's budgets are in the account currency's minor unit &mdash;
   paise, 100 to the rupee, *not* Snap's micro at 1,000,000. The client reads the account's own currency
   and refuses rather than guessing an FX rate, because a wrong unit here is a 10,000× error in the

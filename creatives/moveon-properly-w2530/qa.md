@@ -20,7 +20,7 @@ type set programmatically by `typeset.py`.
 | §6.4 banned vocabulary | **Pass.** 2026-08-27 — all 39 patterns from `pocket-dating-coach/scripts/check-banned-strings.sh` (31 phrase, 3 exact, 5 referral) applied to the on-asset copy AND the `script.md` spoken lines. Zero hits. See "Banned-vocabulary check" below. |
 | Dimensions | **Pass.** 1080×1920 exactly. |
 
-**No open items on this asset.** The §6.4 check is done (below); everything else passes.
+**One open item — see the §8 independent pass below, which returned `escalate` on §6.2 (labelling AI imagery).** The §6.4 banned-vocabulary check is done and clean.
 
 ## Banned-vocabulary check — 2026-08-27
 
@@ -58,6 +58,60 @@ separately against that file:
   by this check: the same session that wrote the copy ran the wordlist. A fresh
   session or different model should review the finished asset against
   `rules/compliance.md` before handoff.
+
+## §8 independent second pass — 2026-08-27, fresh session
+
+Requested by the §6.4 check above ("a fresh session or different model should review the
+finished asset against `rules/compliance.md` before handoff") and required by
+`rules/compliance.md` §8. Done by reading the rendered `asset-c5-a.jpg` itself, not the
+notes about it.
+
+**Verdict: `escalate` — one item for the app owner. Everything else confirmed clean.**
+
+| Rule | Independent finding |
+|---|---|
+| §1 money / provider | **Confirmed clean.** Cream domestic interior, window, plant, framed art, plain dusty-rose tee. No luxury signifier, no cash, no car, no formalwear, nobody being served. Nothing implies being kept or provided for. |
+| §2 purchase language | **Confirmed clean.** Nothing implies a purchase, subscription or credit. |
+| §3 rupee referral | **Confirmed clean.** Not present. |
+| §4 "high-earning" | **Confirmed clean, and the flagged phrase holds.** The prior pass asked for explicit confirmation on "Verified, not vibes." It stays on the right side of the rule for a specific reason worth writing down: it names the *check* (identity verification) rather than the *attribute* (income). §4's approved phrasing is "identity-verified and established professionals", and "verified" is the sanctioned half of it. Had it read "vetted professionals" or leaned on "established", it would be closer to the line. |
+| §5 ranking | **Confirmed clean.** No percentile, no score, no top-N claim. |
+| §6.1 man's real photo | **Confirmed clean.** No man in frame. Three framed pictures on the walls; the right-hand one is abstract, the others are blurred beyond any identifiable face. |
+| §6.3 18+ | **Confirmed clean.** Subject reads clearly late-20s. |
+| §6.4 banned vocabulary | **Confirmed** — re-read the three pattern arrays against the burned-in type independently. 0 hits. |
+| **§6.2 label AI imagery** | **ESCALATE — see below.** |
+
+### §6.2 — the one item, and why it is a decision rather than an edit
+
+`rules/compliance.md` §6.2 opens with **"Label AI imagery"** and adds that creative
+showing a portrait "must not imply it's an untouched snapshot". The gate above marked
+§6.2 `pass` on the grounds that the Gemini ✦ watermark was covered by the cream footer.
+
+That reasoning satisfies one half of the rule and moves *away* from the other. Removing
+a tool watermark is the opposite of labelling: the asset is now a fully AI-generated
+portrait of a woman, carrying no indication that she is generated, and nothing in frame
+signals it.
+
+What sharpens it is the format. `script.md` describes her as "the *speaker* — her story,
+her eyes, her decision", and the burned-in line is first person: "Move on toh karna hai —
+par dhang se." A face plus a first-person account of a breakup reads as **testimony from
+a real customer**. That is a stronger implicit claim than an AI illustration makes, and it
+is the claim §6.2's second sentence is about.
+
+This is not a copy tweak to make and move on — `SPEC.md`'s compliance non-negotiables say
+a hit is "a decision for the app owner". Three ways it could go, all his call:
+
+1. **Label it** — an on-asset "AI-generated" / "Illustrative" mark. Costs stop-scroll and
+   partly undoes the point of the cream-UGC look.
+2. **Change the framing** so it is not implied testimony — drop first person, or use the
+   still as a statement rather than a quote. Keeps the plate, loses the Tinder-Move-On-Salon
+   reference the idea was built on.
+3. **Rule that §6.2 means only "no visible AI-tool watermark"** for paid social, and that
+   labelling is an in-product obligation. Defensible, but it should be written into
+   `rules/compliance.md` as an explicit scope, not left as an inference — otherwise the next
+   asset re-litigates it.
+
+Note also that this is independent of Meta's own synthetic-media rules, which have not been
+checked here and are the platform's to enforce.
 
 ## Note on Grok text overlay (Sree raised it)
 Grok can overlay text, and it's fine for a fast rough comp. But `creative-generation.md` §2 keeps type programmatic on purpose: a sampler cannot be trusted to hold the lowercase `rite` spelling and Gabarito casing that carry the brand pun, and garbled type on a paid asset is unshippable. So: Grok overlay = ok for throwaway comps; `typeset.py` = the shippable path.

@@ -349,23 +349,29 @@ class MetaClient:
 
     # ---- ad set ----------------------------------------------------------
     def create_adset(self, *, name, campaign_id, targeting, daily_budget_inr,
-                     start_time, end_time, pixel_id) -> dict:
+                     start_time, end_time, pixel_id=None) -> dict:
         """Create the ad set, PAUSED, optimising for landing-page views.
 
-        `pixel_id` is required for the same reason snap.py requires it: LANDING_PAGE_VIEWS
-        is a pixel-observed conversion, and an ad set asked to optimise for something it
-        cannot see is not the ad set anyone intended. Meta is stricter than Snap here —
-        Snap counts landing-page views natively by rendering the page in its own in-app
-        browser, which is why a pixel-less Snap squad still reported 59 of them on
-        2026-08-26. Meta has no such fallback: no pixel means no signal at all.
+        **`pixel_id` is deliberately optional here, unlike snap.py's equivalent, and
+        `promoted_object` is deliberately not sent.** This was wrong in the first cut of
+        this module: it mirrored Snap's hard requirement and asserted that "Meta has no
+        fallback, no pixel means no signal at all". Checking the account on 2026-08-27
+        showed the opposite. Its own live LANDING_PAGE_VIEWS ad set,
+        `FB_W_20-25_ID_Romantic`, binds no dataset at the ad-set level and has Website
+        events unchecked, and the ad under it reported 36 landing-page views anyway.
+        Meta's Tracking panel says the ad account's *default* conversion dataset is used
+        unless told otherwise, so the binding is at the account level, not here.
+
+        `promoted_object` carrying a pixel is required for OFFSITE_CONVERSIONS, which is
+        a different optimisation goal than this one. Sending it on an OUTCOME_TRAFFIC ad
+        set optimising for LANDING_PAGE_VIEWS risks a rejection for a field the account's
+        own working ad set does not set — so this follows the account's observed
+        convention, which is the same rule snap.py's pixel requirement came from, applied
+        honestly to a network whose convention turned out to be the other way.
+
+        A conversions-objective ad set WOULD need `promoted_object`. That is a new code
+        path when someone builds it, not a flag on this one.
         """
-        if not pixel_id:
-            raise MetaError(
-                "pixel_id is required for a LANDING_PAGE_VIEWS ad set.\n"
-                "Unlike Snap, Meta has no native fallback that counts landing-page views "
-                "without a pixel — the optimisation would have nothing to read.\n"
-                "Set meta.pixel_id in config.local.yaml."
-            )
         self.require_inr()
         return self.post(f"/{campaign_id}/adsets", {
             "name": name,
@@ -379,7 +385,6 @@ class MetaClient:
             # artefact of a rupee figure, and int() would floor it to 99999 paise and
             # put the ad set a paisa under rules/budget.md's floor.
             "daily_budget": round(daily_budget_inr * MINOR),
-            "promoted_object": {"pixel_id": str(pixel_id), "custom_event_type": "OTHER"},
             "destination_type": "WEBSITE",
             "start_time": start_time,
             "end_time": end_time,

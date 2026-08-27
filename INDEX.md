@@ -4,4 +4,5 @@
 
 | rec_id | network | status | campaign | ad set id | verdict | created |
 |---|---|---|---|---|---|---|
+| rec-2026-08-27-moveon-w2530-meta | meta | proposed | RA_TRAFFIC_GETW_IN_BLR_TOF_202608 |  |  | 2026-08-27 |
 | rec-2026-08-21-women-1822-casual-lpv | snap | live | RA_TRAFFIC_GET_IN_PAN_TOF_202608 | 1b993192-30b9-47e5-9e1a-cd0f11607292 |  | 2026-08-21 |

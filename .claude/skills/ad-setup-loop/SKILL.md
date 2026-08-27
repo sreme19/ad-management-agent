@@ -122,11 +122,12 @@ depend on that file being current.
 
    **On Meta, use `ad-agent meta-push <rec_id> --dry-run` first, then the real run.** Same shape as
    `snap-push` and the same gates. Three Meta-specific things to surface to the user rather than
-   discover mid-run: a **pixel is mandatory** (Meta has no native landing-page-view fallback the way
-   Snap's in-app browser does); the ad account must settle in **INR** or the client refuses, because
-   Meta budgets are paise and Snap's are micro; and a **campaign-budget-optimisation parent is refused
-   outright with no escape hatch**, because it ignores the ad-set budget rather than capping it, which
-   makes the record's stated budget meaningless.
+   discover mid-run: **no pixel is needed** (Meta binds the dataset at account level, unlike Snap —
+   don't tell the user to go set one up); the ad account must settle in **INR** or the client refuses,
+   because Meta budgets are paise and Snap's are micro (the live account is INR, confirmed
+   2026-08-27); and a **campaign-budget-optimisation parent is refused outright with no escape
+   hatch**, because it ignores the ad-set budget rather than capping it, which makes the record's
+   stated budget meaningless.
 
    Read the read-back diff rather than skimming it: **Meta rewrites targeting it considers suboptimal
    instead of rejecting it**, so an ad set created with Advantage Audience off can come back on with
