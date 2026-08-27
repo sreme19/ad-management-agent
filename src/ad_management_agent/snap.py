@@ -59,12 +59,20 @@ BUDGET_KEYS = {
 }
 
 
-def _safety_violations(method: str, payload: object, path: str = "") -> list[str]:
+def _safety_violations(method: str, payload: object, path: str = "",
+                       unchanged: dict | None = None) -> list[str]:
     """Every reason this outbound payload must not be sent. Empty means safe.
 
     Walks the whole structure rather than checking the top level, because Snap wraps
     every object in a list under a plural key — `{"adsquads": [{"status": "ACTIVE"}]}`
     hides the field two levels down.
+
+    `unchanged` is the object as it currently exists on Snap. A budget key whose
+    value is byte-identical to what is already stored is an ECHO, not a change, and
+    is allowed through. That distinction is load-bearing: Snap's update is a full
+    replace, so a field left out is a field deleted. Without this, a pause that
+    omitted daily_budget_micro to satisfy the guard silently wiped the campaign's
+    daily cap — which is exactly what happened on 2026-08-26 at 17:24 UTC.
     """
     found: list[str] = []
     if isinstance(payload, dict):
@@ -72,12 +80,13 @@ def _safety_violations(method: str, payload: object, path: str = "") -> list[str
             here = f"{path}.{key}" if path else key
             if key == "status" and isinstance(value, str) and value.upper() in ENABLING_STATUSES:
                 found.append(f"{here} = {value!r} would enable an object")
-            if key in BUDGET_KEYS and method.upper() in ("PUT", "PATCH"):
+            is_echo = bool(unchanged) and unchanged.get(key, object()) == value
+            if key in BUDGET_KEYS and method.upper() in ("PUT", "PATCH") and not is_echo:
                 found.append(f"{here} on a {method.upper()} would change an existing budget")
-            found += _safety_violations(method, value, here)
+            found += _safety_violations(method, value, here, unchanged)
     elif isinstance(payload, list):
         for i, item in enumerate(payload):
-            found += _safety_violations(method, item, f"{path}[{i}]")
+            found += _safety_violations(method, item, f"{path}[{i}]", unchanged)
     return found
 
 
@@ -117,7 +126,8 @@ class SnapClient:
                 ) from e
         return self._token
 
-    def _call(self, method: str, path: str, payload: dict | None = None) -> dict:
+    def _call(self, method: str, path: str, payload: dict | None = None,
+              unchanged: dict | None = None) -> dict:
         # The paused-only rule, enforced at the one place every request passes through.
         #
         # SPEC.md decision #3 (as amended 2026-08-26) states that this module never
@@ -128,7 +138,7 @@ class SnapClient:
         # method someone adds. This is: a new call cannot forget a check it never had
         # to remember. There is no override flag, and there is not meant to be one.
         if payload is not None:
-            violations = _safety_violations(method, payload)
+            violations = _safety_violations(method, payload, unchanged=unchanged)
             if violations:
                 raise SnapSafetyError(
                     f"REFUSED: {method} {path} would break the paused-only rule.\n"
@@ -153,8 +163,8 @@ class SnapClient:
     def post(self, path: str, payload: dict) -> dict:
         return self._call("POST", path, payload)
 
-    def put(self, path: str, payload: dict) -> dict:
-        return self._call("PUT", path, payload)
+    def put(self, path: str, payload: dict, unchanged: dict | None = None) -> dict:
+        return self._call("PUT", path, payload, unchanged=unchanged)
 
     # ---- helpers ---------------------------------------------------------
     @staticmethod
@@ -246,14 +256,17 @@ class SnapClient:
             "buy_model": current.get("buy_model", "AUCTION"),
             "status": "PAUSED",
         }
-        # Deliberately NOT echoing daily_budget_micro. It is not required for this
-        # update, and sending it would trip the paused-only guard in _call() — the
-        # guard is right: a pause has no business carrying a budget field at all.
-        for k in ("end_time", "objective_v2_properties"):
+        # Echo every field that exists, budgets included. Snap's update is a full
+        # replace: anything omitted is deleted, so leaving the budget out to keep the
+        # guard happy destroys the cap instead of protecting it. The guard is given
+        # `current` so it can verify each budget value is identical to what is already
+        # stored — an echo passes, a change still does not.
+        for k in ("end_time", "objective_v2_properties", "daily_budget_micro",
+                  "lifetime_spend_cap_micro"):
             if current.get(k) is not None:
                 body[k] = current[k]
         self._one(self.put(f"/adaccounts/{self.cfg['ad_account_id']}/campaigns",
-                           {"campaigns": [body]}), "campaigns")
+                           {"campaigns": [body]}, unchanged=current), "campaigns")
         after = self.get(f"/campaigns/{campaign_id}")["campaigns"][0]["campaign"]
         if after.get("status") != "PAUSED":
             raise SnapError(
