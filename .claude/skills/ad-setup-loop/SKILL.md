@@ -119,7 +119,10 @@ depend on that file being current.
    click. `--accept-campaign-cap` proceeds anyway as a stated deviation, and prints the `note` command
    to record it.
 
-   **On Meta, hand it back.** No API call, no credential (`SPEC.md` decision #10, unamended for Meta).
+   **On Meta, hand it back &mdash; for now.** Decision #10 was extended to Meta on 2026-08-27, so a client
+   is permitted, but none is written: there is no `meta.py`, no credential on disk, and
+   `rules/networks.yaml` says `meta.creation: none`. So there is nothing to call, and this stays a
+   hand-back until that changes. Do not attempt a Meta API call on the strength of the amendment.
    Tell the user exactly what to name each level and what to paste into targeting/budget fields — a
    checklist they can follow without re-deriving anything. Include the full UTM string verbatim as one
    of the fields to paste; note that Meta reads `utm_content` as the ad-level id where Snap reads

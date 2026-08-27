@@ -12,7 +12,7 @@ instead &mdash; this page assumes you're comfortable with terms like "CLI" and "
 | LLM | None, in this repo | Every mode is a Claude Code skill; the CLI never imports or calls an Anthropic client (`SPEC.md` decision #1) |
 | Ledger storage | Markdown files with YAML front matter, one per campaign, via **PyYAML** | Chosen over a spreadsheet (no pre-existing habit to extend, unlike job-hunt's Career Hacking Tracker) and over plain JSON (a human has to read this too) — see [The ledger](The-ledger) |
 | CLI framework | Python's built-in **argparse**, one subparser per command | Small, dependency-free surface — `propose`, `log-setup`, `log-review`, `abandon`, `stats`, `dump-ledger`, `fetch-analytics` |
-| External data | One plain HTTP call (`urllib`) to `pocket-dating-coach`'s internal endpoint, plus `urllib` against Snap's Marketing API | No SDK and no scraping. Snap credentials since 2026-08-26, for paused-only creation; **no Meta credential** (`SPEC.md` decision #10, amended for Snap only) |
+| External data | One plain HTTP call (`urllib`) to `pocket-dating-coach`'s internal endpoint, plus `urllib` against Snap's Marketing API | No SDK and no scraping. Snap credentials since 2026-08-26, for paused-only creation. Decision #10 was extended to Meta on 2026-08-27, but **no Meta credential is on disk and no Meta client is written yet** |
 | Packaging | `pyproject.toml`, installed with `pip install -e .` | Ships an `ad-agent` console-script entry point |
 | Config | A gitignored `config.local.yaml`, loaded with PyYAML | Real endpoint URL, API key, and DB connection string live here, never in code |
 
@@ -102,7 +102,9 @@ with a clear stderr message and a non-zero status rather than guessing at a resu
 - **No server, no daemon, no cron in this repo.** Every mode is triggered by asking for it in a Claude
   Code session. `ad-audit` is the one candidate for a future scheduled task (`SPEC.md` decision #2), and
   only once it's been trusted from repeated manual runs — not attempted yet.
-- **No Meta Marketing API client, and no Meta credential anywhere in config or code.** Snap is the
+- **No Meta Marketing API client, and no Meta credential anywhere in config or code** &mdash; still true
+  as of this page, though decisions #3/#10 were extended to Meta on 2026-08-27 and a client is now
+  permitted (Marketing API v26.0, app `1020330197292995`, system user `riteangle-api`). Snap is the
   exception, and only since 2026-08-26: `snap.py` is a ~240-line `urllib` client with no SDK, holding
   credentials in gitignored `config.local.yaml`, minting access tokens per run and never writing them
   to disk. It can create — always `PAUSED` — and it cannot enable anything or change a live budget,

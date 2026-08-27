@@ -30,8 +30,11 @@ Amended by the app owner on 2026-08-26, after the trade-off was put to them. Bot
   API to diff it against the plan before it exits. There is no enable, resume or activate call
   anywhere in `snap.py`, and none is to be added without the app owner saying so in as many words.
   **Starting spend is a human action in Ads Manager, every time.**
-- **Meta: entirely hands-off, unchanged.** No Meta Ads Manager API call, and no Meta Marketing API
-  credential in this repo. `ad-setup-loop` output for Meta is instructions a human executes by hand.
+- **Meta: permitted since 2026-08-27, but not built yet.** The app owner extended decision #3 to Meta
+  on the same paused-only terms as Snap, so a Meta client *may* be written. None exists today: there is
+  no `meta.py`, no Meta credential in `config.local.yaml`, and `rules/networks.yaml` still declares
+  `meta.creation: none`. Until that lands, `ad-setup-loop` output for Meta is still instructions a
+  human executes by hand. Permission is not capability — don't read this bullet as a push path.
 - **Never change the budget of anything already live**, on either network.
 
 Be clear about what this cost. The old rule ("never touches a live account") was true *by

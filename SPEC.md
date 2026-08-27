@@ -38,10 +38,13 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
    - `ad-research` — mode 9: work an open question from the queue, ingest notes brought in by hand, and
      derive durable learnings into `research/`. The mode that fills the library the other four read
      from. See "Research" below for the precedence rule against `rules/`.
-3. **The boundary, as amended 2026-08-26.** Originally: this agent never calls a Meta or Snap Ads
-   Manager API at all, and every `ad-setup-loop` output is instructions a human executes by hand.
-   **The app owner lifted that on 2026-08-26**, explicitly and after the trade-off was put to them,
-   so that setup could be automated. What stands now:
+3. **The boundary, as amended 2026-08-26 (Snap) and 2026-08-27 (Meta).** Originally: this agent never
+   calls a Meta or Snap Ads Manager API at all, and every `ad-setup-loop` output is instructions a
+   human executes by hand. **The app owner lifted that for Snap on 2026-08-26**, explicitly and after
+   the trade-off was put to them, so that setup could be automated. **On 2026-08-27 the app owner
+   extended the same permission to Meta**, in as many words, after a readiness probe of the live Meta
+   account. The rules below are written per-network only where the networks actually differ; the
+   paused-only discipline is identical on both. What stands now:
 
    - The agent **may create** campaigns, ad squads, creatives and ads on Snap, through
      `ad-agent snap-push`, and **only ever with status `PAUSED`**.
@@ -72,8 +75,16 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
    and the paused-only rule above is what carries the weight instead. Putting the check at the single
    choke point every request passes through is what "careful" has to mean to be worth anything: a
    method added later cannot skip a check it never knew about, and `tests/test_snap_safety.py` asserts
-   a refused request never reaches the network. Meta is unchanged and remains fully hands-off; this
-   amendment covers Snap only.
+   a refused request never reaches the network.
+
+   **The Meta extension (2026-08-27) inherits that reasoning rather than restating it.** A Meta client
+   is only permitted on the same terms: creation `PAUSED` only, no enable/resume/activate call in the
+   module at all, no budget change to anything that already exists, read-back-and-diff after every
+   create, and the refusal enforced at the single transport choke point rather than asserted per
+   method. A Meta client that does not carry its own equivalent of `SnapClient._call`'s check is not
+   permitted by this decision — the permission is to build that shape, not to reach the API by any
+   means. What is written above about the guarantee being weaker now applies twice over, because
+   there will be two live accounts reachable from this repo instead of one.
 4. **The close-the-loop step is mandatory, not optional.** A `propose`d recommendation with no
    `log-setup` sits as an open loose end forever; `ad-audit` cannot join a recommendation to a real
    outcome without the real `ad_set_id` on record. See "Ledger" below for the exact lifecycle.
@@ -104,15 +115,34 @@ skills inside a Claude Code session, with no metered Anthropic API key anywhere 
    one less thing to context-switch on. The CLI has no dependency on `pocket-dating-coach`'s TypeScript
    beyond calling its JSON endpoint over HTTP.
 9. **Repo is private.** Targeting, budget figures, and creative strategy are business-sensitive.
-10. **Credentials, as amended 2026-08-26.** Originally: no Meta or Snap Marketing API credentials in
+10. **Credentials, as amended 2026-08-26 (Snap) and 2026-08-27 (Meta).** Originally: no Meta or Snap Marketing API credentials in
     this repo at all, which is what made #3 structurally true rather than merely a policy. **Amended
     for Snap only, by the app owner, on the same call as #3.** `config.local.yaml` (gitignored) now
     holds a Snap OAuth client id, client secret and refresh token for the `riteangle-marketing-api`
     app, scoped `snapchat-marketing-api`.
 
-    **No Meta credentials, still — that half of #10 stands unamended.** Research for modes 7/8 continues
-    to work from `pocket-dating-coach`'s exports plus the public Meta Ads Library and Snap ad search.
-    Access tokens are minted per run from the refresh token and never written to disk.
+    **Amended for Meta too, by the app owner, on 2026-08-27.** `config.local.yaml` may now also hold
+    Meta Marketing API credentials for the `riteangle` app (App ID `1020330197292995`, owned by the
+    `Equal Dating App` business portfolio, ID `1587705756249660`). The agreed shape is a **system-user
+    token**, not a user token: the system user `riteangle-api` (ID `61593371450505`) is portfolio-owned
+    and its token does not expire, where a long-lived user token lasts ~60 days and Meta offers no
+    refresh-token equivalent — it would expire mid-campaign, silently.
+
+    That route requires claiming the previously personal ad account `1561367575690055` into the
+    portfolio, because a system user can only ever be assigned portfolio-owned assets — which is why
+    `riteangle-api` currently sits with zero assets. Meta treats the claim as effectively one-way, and
+    the portfolio's ad-account creation limit is 1. That cost was put to the app owner and the route was
+    chosen on 2026-08-27. **The claim itself, the asset assignment, and the token generation are manual
+    steps and were not complete when this was written** — so the credential block does not exist yet.
+    Anything reading this decision should verify `config.local.yaml` rather than assume.
+
+    Snap's access tokens are minted per run from the refresh token and never written to disk. Meta's
+    system-user token has no refresh step, so it is read from `config.local.yaml` per run and likewise
+    never copied elsewhere. As with the Snap client secret, Meta shows a generated system-user token
+    **once** — there is no regenerate.
+
+    Research for modes 7/8 continues to work from `pocket-dating-coach`'s exports plus the public Meta
+    Ads Library and Snap ad search; nothing about this amendment requires research to authenticate.
 11. **The destination has an audience, and the gate that enforces it is hard.** `propose` refuses to
     write a record whose ad-set audience doesn't match the framing of its landing page, per
     `rules/destinations.yaml`. There is no override flag and `amend` cannot launder one — a blocked
@@ -150,10 +180,15 @@ they are load-bearing: the iOS build was actually rejected under App Store Guide
 ## Non-negotiables (never automate a live account — see decision #3)
 
 - **Never enable anything, and never change the budget of anything already live**, on either network.
-  Creation is permitted on Snap and only ever `PAUSED` (decision #3, as amended 2026-08-26); starting
-  spend is a human action, every time.
-- Never call a Meta Ads Manager API at all, and never hold Meta Marketing API credentials — that half
-  of decision #10 is unamended.
+  Creation is permitted on Snap (amended 2026-08-26) and on Meta (amended 2026-08-27), and only ever
+  `PAUSED`; starting spend is a human action, every time. This is now the whole of the boundary — there
+  is no longer a network this agent is barred from touching, so it is the only line left.
+- **Never add an enable, resume or activate call to a network client**, on either network, without the
+  app owner saying so in as many words. Pausing is permitted (it can only stop spend); the asymmetry is
+  deliberate — see `snap.py.pause_campaign`.
+- Never leave Meta's **ads MCP server** channel enabled for an ad account this repo drives directly
+  (Business settings → ads MCP server → "Actions allowed"). Two independent write paths into one live
+  ad account, one of them outside this repo's guards, is the failure decision #3 exists to prevent.
 - Never give this agent read access to member-data tables (decision #7's PII boundary).
 
 ## Architecture
@@ -322,10 +357,18 @@ network splits the same money below the floor rather than adding reach — and i
 
 **The `creation` field can only ever refuse.** `networks.require_creation` is called *in addition to*
 a command's own hardcoded network check, never instead of it. Flipping `meta` to `paused-only` in the
-yaml grants nothing: `snap-push` still refuses a non-`snap` record before it consults the registry,
-there is no Meta client, and there is no Meta credential (decision #10). The registry declares intent
-and can tighten; the absence of credentials and `snap.py`'s transport-layer refusal are what hold.
-`tests/test_networks.py` asserts both directions.
+yaml grants nothing on its own: `snap-push` still refuses a non-`snap` record before it consults the
+registry. The registry declares intent and can tighten; the client modules' transport-layer refusals
+are what hold. `tests/test_networks.py` asserts both directions.
+
+**`meta.creation` stays `none` until a Meta client actually exists.** Decision #3 was extended to Meta
+on 2026-08-27, so the *permission* is granted — but permission is not capability, and the registry
+describes what the code can do, not what the app owner has agreed to. Flipping the field the moment
+the decision changed would delete a live refusal and put nothing behind it, and would leave a future
+session reading `paused-only` and reasonably concluding a push path exists. The flip belongs in the
+same commit as `meta.py` and its safety tests, and `test_require_creation_refuses_meta` is the thing
+holding that ordering in place — when it is changed, it should be changed to assert the new direction,
+never simply deleted.
 
 ## Rules (single source of truth — read live, edited in place when refined)
 

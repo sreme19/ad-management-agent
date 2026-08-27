@@ -5,8 +5,10 @@ Most `ad-agent` commands read and write the real ledger, or make one plain HTTP 
 creates them `PAUSED` and can never enable them or change the budget of anything already live, but it
 is a live-account write and it is called out below rather than buried.
 
-Meta is unchanged and entirely hands-off &mdash; no API call, no credential. Meta setup still happens by
-hand, in the Ads Manager UI, following what a skill hands you. See
+Meta creation was permitted on 2026-08-27 (decisions #3 and #10, extended to Meta), but **no Meta
+client exists yet** &mdash; no `meta.py`, no credential, and the registry still says
+`meta.creation: none`. So Meta setup still happens by hand, in the Ads Manager UI, following what a
+skill hands you. There is no `meta-push` command to reach for. See
 [Safety and guardrails](Safety-and-guardrails) and `SPEC.md` decisions #3 and #10.
 
 ## Start here when you come back to this repo
