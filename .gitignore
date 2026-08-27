@@ -8,3 +8,22 @@ dist/
 build/
 
 .DS_Store
+
+# Competitor reference media — third-party creative pulled from public posts.
+# Deliberately NOT committed: these are other companies' copyrighted assets, the
+# store's own README marks everything here NOT SHIPPABLE, and the durable record
+# is the prose in research/notes/ plus the shortcodes in sources-*.md, which make
+# every file re-fetchable. Markdown in this tree IS tracked — only media is ignored.
+creatives/_competitor-reference/**/*.png
+creatives/_competitor-reference/**/*.jpg
+creatives/_competitor-reference/**/*.jpeg
+creatives/_competitor-reference/**/*.webp
+creatives/_competitor-reference/**/*.gif
+creatives/_competitor-reference/**/*.mp4
+creatives/_competitor-reference/**/*.mov
+
+# Downloaded source video/audio and derived frames (yt-dlp / ffmpeg / whisper).
+# Re-pull with the commands in creatives/_competitor-reference/sources-*.md
+*.wav
+*.m4a
+*.info.json

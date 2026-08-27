@@ -115,3 +115,23 @@ Same as the first pass: feed the Bumble/Aisle creator and brand-film patterns in
 reference hooks. New addition — the Betterhalf reputation-risk finding is strong enough to be worth a
 line in ad copy testing (something adjacent to "Real match guaranteed" positioned as a direct answer to
 "my membership fee bought silence"), subject to `rules/compliance.md` review before it ships.
+
+---
+
+## Addendum — 27 Aug 2026: accounts the 26 Aug sweep missed
+
+The sweep above called itself a full pass over "all 24 competitors named in the matrix Sree shared."
+That matrix was the boundary, not the market. One account found during a 27 Aug scanning session was
+not on it:
+
+| Name | Handle | Market | Positioning | Assets held |
+|---|---|---|---|---|
+| VLNCY | [@vlncy.dating](https://www.instagram.com/vlncy.dating/) | Bangalore only | "50:50 men-to-women ratio, guaranteed"; "Equality doesn't mean *more* choices. It means *better* choices."; compatibility-based matching; tagline DATE WITHOUT SURPRISES | `vlncy.dating/` — 3 files |
+
+See `research/notes/note-2026-08-27-vlncy-pool-balance-positioning.md` for the full read, and
+`lrn-2026-08-27-vlncy-owns-better-not-more` for why it matters to the women's lane.
+
+**Assets now persist.** The tooling limitation recorded above — that no competitor image could be
+saved — was a browser-tool limitation, not a repo one. Screenshots handed over directly save fine.
+`shaadi.com/` and `vlncy.dating/` hold real files as of this date. The same NOT-SHIPPABLE rule in
+`README.md` governs them: reference for a brief, never reuse.
