@@ -40,12 +40,31 @@ destinations:
   /get/w:
     audience: women
     paid_traffic: true
-    verified: 2026-08-26
+    verified: 2026-08-27
     note: >-
-      The women's variant of /get, built 2026-08-25. Same route file, audience
-      switched off the path segment; her page leads with the ordered list and
-      carries the vetting second, and verification is framed as something she
-      receives rather than performs. Copy verified by reading the rendered page.
+      The women's variant of /get, built 2026-08-25 and reworked 2026-08-27. Same
+      route file, audience switched off the path segment; verification is framed
+      as something she receives rather than performs. Copy verified by reading the
+      rendered page.
+      REWORKED 2026-08-27 and re-dated per this file's own rule. Three changes.
+      (1) The page no longer opens on the flood. It was written on the premise
+      that her problem is volume, and lrn-2026-08-27-complaint-is-quality-not-volume
+      found five creators describing the opposite — attention that is plentiful and
+      worthless. It now leads "Vetted before he reaches you", which is also the
+      MOVE-ON-PROPER ad's own line, so ad and page no longer change the subject
+      between the tap and the scroll. (2) It has imagery for the first time: three
+      AI-generated illustrations cut from plates this repo already approved,
+      labelled as illustrations in the footer per compliance.md 6.2. (3) IT NOW
+      CAPTURES A LEAD — WhatsApp or email, writing to marketing_leads, which had
+      existed since 2026-08-15 with a dialer attached and had never been written to
+      by anything. That closes the gap in lrn-2026-08-26-no-lead-capture-on-destinations
+      and gives iPhone traffic somewhere to go; whether it converts or just adds
+      friction is q-2026-08-26-lead-capture-conversion, still open until there is
+      data. The Play tap remains the primary CTA and the form sits below it, so the
+      funnel that already works was not put behind the one being tested.
+      Also removed: the per-man percentages (92/78/61) the old mock showed beside
+      each profile, which was a hard numeric ranking of people and is what
+      compliance.md #5 forbids.
       Deployed 2026-08-25 (pocket-dating-coach d1b04182) and opened to paid traffic
       2026-08-26 after tracking.md's checks passed against the live URL: /get 200,
       /get/w 200, /get/xyz 404; her copy confirmed; the Play referrer carries
