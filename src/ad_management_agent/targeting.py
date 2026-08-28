@@ -164,12 +164,17 @@ def to_snap(spec: dict) -> dict:
     }
     if spec.get("os"):
         payload["devices"] = [{"os_type": _SNAP_OS[spec["os"]], "operation": "INCLUDE"}]
-    if spec.get("expansion", True):
-        payload["enable_targeting_expansion"] = True
-        payload["auto_expansion_options"] = {
-            "interest_expansion_option": {"enabled": True},
-            "custom_audience_expansion_option": {"enabled": True},
-        }
+    # Send the flag either way. Omitting it is NOT the same as turning it off:
+    # Snap defaults targeting expansion ON, so an omitted key silently broadens the
+    # audience while the record claims it is narrow. Found 2026-08-28 on
+    # rec-2026-08-28-moveon-swagger-w2530-snap, whose record said `expansion: off`
+    # and whose live ad squad read back `enable_targeting_expansion: true`.
+    expansion = bool(spec.get("expansion", True))
+    payload["enable_targeting_expansion"] = expansion
+    payload["auto_expansion_options"] = {
+        "interest_expansion_option": {"enabled": expansion},
+        "custom_audience_expansion_option": {"enabled": expansion},
+    }
     return payload
 
 
@@ -206,6 +211,11 @@ def snap_readback_checks(spec: dict, squad_live: dict) -> list[tuple[str, object
     if spec.get("os"):
         devices = live.get("devices") or [{}]
         rows.append(("os", devices[0].get("os_type"), _SNAP_OS[spec["os"]]))
+    # Checked unconditionally, and defaulting to True on the live side, because the
+    # failure being guarded is Snap turning expansion on when the key is absent —
+    # a check that skipped a missing key would pass exactly the case that broke.
+    rows.append(("expansion", bool(live.get("enable_targeting_expansion", True)),
+                 bool(spec.get("expansion", True))))
     return rows
 
 

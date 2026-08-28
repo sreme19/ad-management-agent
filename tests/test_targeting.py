@@ -78,10 +78,28 @@ class TestSnapTranslation:
     def test_no_os_means_no_device_narrowing(self):
         assert "devices" not in targeting.to_snap(spec(os=None))
 
-    def test_expansion_off_omits_the_expansion_block(self):
+    def test_expansion_off_sends_the_flag_as_false_rather_than_omitting_it(self):
+        # This test used to assert the opposite, and the opposite was a bug. Snap
+        # defaults targeting expansion ON, so omitting the key silently broadens the
+        # audience while the record claims it is narrow. Found on
+        # rec-2026-08-28-moveon-swagger-w2530-snap: record said `expansion: off`,
+        # live ad squad read back `enable_targeting_expansion: true`.
         payload = targeting.to_snap(spec(expansion=False))
-        assert "enable_targeting_expansion" not in payload
-        assert "auto_expansion_options" not in payload
+        assert payload["enable_targeting_expansion"] is False
+        assert payload["auto_expansion_options"] == {
+            "interest_expansion_option": {"enabled": False},
+            "custom_audience_expansion_option": {"enabled": False},
+        }
+
+    def test_the_readback_catches_snap_defaulting_expansion_on(self):
+        # The live squad has no expansion key at all — which is how Snap reports an
+        # ad squad it has broadened by default. A check that skipped the missing key
+        # would pass exactly the case that broke.
+        rows = targeting.snap_readback_checks(
+            spec(expansion=False), {"targeting": {"demographics": [{}], "geos": []}}
+        )
+        got, want = next((g, w) for label, g, w in rows if label == "expansion")
+        assert (got, want) == (True, False)
 
 
 class TestReadBackIsDerivedNotHardcoded:
