@@ -1,13 +1,13 @@
 ---
 rec_id: rec-2026-08-28-moveon-swagger-w2530-snap
 network: snap
-status: proposed
+status: live
 campaign_name: RA_TRAFFIC_GETW_IN_PAN_TOF_202608
 ad_set_name: WOMEN_25-30_CASUAL_MOVE-ON-PROPER_LPV
 ad_name: VID_MOVE-ON-PROPER_A_20260828
-campaign_id: null
-ad_set_id: null
-ad_id: null
+campaign_id: 3a89d273-15b9-423d-9889-f603e2b6b91c
+ad_set_id: dee446d1-cb16-4b14-bcb0-41fd44e8531c
+ad_id: cd48b86d-607b-4aca-bd22-7aaefaa67de2
 targeting_summary: 'Snapchat, women only, 25-30, pan-India. CASUAL-SELECTIVE persona,
   but run in the SWAGGER register (loud coral/pink, streetwear, attitude) rather than
   the 25-30 security register the MOVE-ON-PROPER hook was written in - a deliberate
@@ -36,6 +36,7 @@ campaign_daily_cap_inr: null
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-28'
 last_note: '2026-08-28'
+executed: '2026-08-28'
 ---
 
 ## Brief (proposed)
@@ -147,3 +148,14 @@ consecutive women's test funded below the floor
 ## Note — incident (2026-08-28)
 
 Pushed to Snap PAUSED 2026-08-28 and read back clean, 10/10 fields matching. Real ids: campaign 3a89d273-15b9-423d-9889-f603e2b6b91c (new, no parent spend cap, so the Rs 300/day ad squad budget is the effective figure), ad squad dee446d1-cb16-4b14-bcb0-41fd44e8531c, creative 299f996b-40c8-4593-9d3d-cbd67fc92808, ad cd48b86d-607b-4aca-bd22-7aaefaa67de2, media 0d56316a-b513-4a7a-91c3-a479a9637fb7. FIRST VIDEO ASSET EVER PUSHED BY THIS REPO. It required a code change the same day: snap.py upload_media gained a media_type parameter (IMAGE|VIDEO) and cli.py snap-push now resolves asset-a.mp4 before asset-a.jpg. Snap's WEB_VIEW creative takes either as its top_snap_media_id, so that is genuinely the whole difference; three tests were added, including one asserting the video path is not a way around the QA gate. Tracking verified against rules/tracking.md line 59: utm_source=snapchat is the correct spelling for this network, and every macro resolved to a literal - utm_term carries the real ad squad id, utm_id the real ad id, utm_content the ad name - so there is no unresolved {{ad.id}} of the kind that cost a week of spend on 2026-08-21. NOT YET ENABLED: enabling is a human action in Ads Manager, then log-setup closes the loop.
+
+## Execution
+
+- Date: 2026-08-28
+- Campaign ID: 3a89d273-15b9-423d-9889-f603e2b6b91c
+- Ad set ID: dee446d1-cb16-4b14-bcb0-41fd44e8531c
+- Ad ID: cd48b86d-607b-4aca-bd22-7aaefaa67de2
+
+## Note — observation (2026-08-28)
+
+ENABLED by the app owner 2026-08-28 and verified live by reading Snap directly, not from the record: campaign ACTIVE, ad squad ACTIVE, ad ACTIVE with review_status=APPROVED. It was not held in review. That approval is the first real evidence on carried risk #2 - Snap's ad review passed a fully AI-generated person on video, unlabelled. Treat it as evidence, not as clearance: an approval is Snap declining to block this asset today, not a ruling that the synthetic-media policy has been read and satisfied, and Snap can pull an ad after approving it. The policy itself is still unread. No delivery yet at first check: our ad squad does not appear in the leaderboard at all, and the only Snap row for 2026-08-28 is the older WOMEN_18-22_CASUAL_LPV set at 3 impressions / Rs 0.02. Zero here means not-yet-started, not a failure - the ad was enabled minutes earlier. WHAT TO WATCH, given this is the first video this account has ever run and the first at Rs 300/day on a new campaign with no parent cap: (1) whether impressions start at all, since a video creative is a new format for this ad account and delivery may behave differently from the static assets; (2) the beacon on get_w for utm_content=VID_MOVE-ON-PROPER_A_20260828 and utm_id=cd48b86d-607b-4aca-bd22-7aaefaa67de2, which is the join that proves tracking end to end - Snap's own LPV count is expected to read LOWER than the beacon per lrn-2026-08-26-snap-and-beacon-disagree-on-lpv; (3) whether it leaves the learning phase at all at Rs 300/day, which rules/budget.md says it may not.
