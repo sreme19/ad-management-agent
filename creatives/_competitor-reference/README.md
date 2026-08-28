@@ -16,7 +16,15 @@ _competitor-reference/
   <account>/
     <post-id>.png          screenshot of the post in context (caption + counts visible)
     notes.md               per-account read: positioning, cadence, what their women-facing content does
+  _adjacent-category/      NOT competitors: fashion/FMCG brands selling to the same women
+    <account>/
+  _organic-creators/       creators, not brands — studied for format, never for partnership
 ```
+
+`_adjacent-category/` exists because the format split (what a feed rewards, what it ignores) reads
+more cleanly in a category with a product to photograph than it does in dating. Nothing filed there
+is a competitor and nothing there should be counted in a competitive sweep. See the 28 Aug 2026
+addendum in `index.md`.
 
 ## Method caveat on "engagement from women"
 

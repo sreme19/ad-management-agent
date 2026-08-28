@@ -135,3 +135,31 @@ See `research/notes/note-2026-08-27-vlncy-pool-balance-positioning.md` for the f
 saved — was a browser-tool limitation, not a repo one. Screenshots handed over directly save fine.
 `shaadi.com/` and `vlncy.dating/` hold real files as of this date. The same NOT-SHIPPABLE rule in
 `README.md` governs them: reference for a brief, never reuse.
+
+---
+
+## Addendum — 28 Aug 2026: adjacent-category reference (`_adjacent-category/`)
+
+25 phone screenshots handed over 28 Aug 2026. **None of these accounts is a dating competitor**, so
+they are not rows in the matrix above and they are not filed as competitors. They are kept because
+they sell to the same person the `FLOODED-WOMAN` and `CASUAL-SELECTIVE` lanes are aimed at — Indian
+women 18–30 on Instagram — and because categories with a product to photograph show the format split
+more cleanly than dating does. Same NOT-SHIPPABLE rule as everything else in this folder.
+
+| Account | Category | Assets | What it is here for |
+|---|---|---|---|
+| [@newme.asia](https://www.instagram.com/newme.asia/) | Fashion D2C | `_adjacent-category/newme.asia/` — 4 | Posts built to be forwarded share at 0.40–0.49; the produced product carousel shares at 0.16 |
+| [@nykaafashion](https://www.instagram.com/nykaafashion/) | Fashion marketplace | `_adjacent-category/nykaafashion/` — 6 | A repeating brand template at 90–177 likes against one untemplated diary line at 576 |
+| [@heynnnow](https://www.instagram.com/heynnnow/) | Fashion (NNNOW by Arvind) | `_adjacent-category/heynnnow/` — 2 | The same sibling occasion as newme, same week, for **1 like**; plus a reel carrying Instagram's own "AI content" label |
+| [@durex.india](https://www.instagram.com/durex.india/) | Sexual wellness | `_adjacent-category/durex.india/` — 3 | 116K likes on a brand-voice still, and 65.8K shares against 37.6K likes on another — the only thing seen anywhere that beats every creator in this set |
+| @lamastoreindia, @gametheoryindia | Paid ads caught in scroll | `_adjacent-category/misc-paid/` — 2 | One phone-grade UGC ad, one price-and-discount ad; format specimens only |
+| [@induviduality](https://www.instagram.com/induviduality/) | Illustrator (Indu Harikumar) | `_organic-creators/induviduality/` — 8 | Eight years of reader-submitted dating stories holding a women's audience with no brand and no budget |
+
+**One warning that must travel with this folder.** Four of the eight `induviduality` posts are
+sexually explicit. That account is filed as a lesson about a *mechanic* — ask your audience for the
+story, illustrate it, name the series — and is **not** a creator-partnership candidate. Nothing about
+it survives Meta's dating-vertical scrutiny (`lrn-2026-08-28-meta-dating-needs-written-permission`)
+or the Apple 1.1.4 history behind `rules/compliance.md`.
+
+Full reads: `research/notes/note-2026-08-28-fashion-feed-format-split.md`,
+`note-2026-08-28-durex-moment-jack.md`, `note-2026-08-28-induviduality-crowdsourced.md`.
