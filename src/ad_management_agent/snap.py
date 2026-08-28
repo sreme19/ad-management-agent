@@ -316,9 +316,18 @@ class SnapClient:
         return self._one(res, "adsquads")
 
     # ---- media + creative + ad -------------------------------------------
-    def upload_media(self, name: str, path: Path) -> dict:
+    def upload_media(self, name: str, path: Path, media_type: str = "IMAGE") -> dict:
+        """Register and upload one media object.
+
+        `media_type` is IMAGE or VIDEO. Snap's WEB_VIEW creative takes whichever as
+        its `top_snap_media_id`, so a video ad differs from an image ad only here —
+        which is why this is a parameter rather than a second code path. Added
+        2026-08-28 for the first video asset (creatives/moveon-swagger-video).
+        """
+        if media_type not in ("IMAGE", "VIDEO"):
+            raise SnapError(f"media_type must be IMAGE or VIDEO, got {media_type!r}")
         media = self._one(self.post(f"/adaccounts/{self.cfg['ad_account_id']}/media", {"media": [{
-            "ad_account_id": self.cfg["ad_account_id"], "name": name, "type": "IMAGE",
+            "ad_account_id": self.cfg["ad_account_id"], "name": name, "type": media_type,
         }]}), "media")
 
         boundary = uuid.uuid4().hex

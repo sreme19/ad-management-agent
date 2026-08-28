@@ -45,6 +45,37 @@ class TestPushRefusesBeforeCreating:
         (ledger_root / "creatives" / "test-asset" / "asset-a.jpg").unlink()
         assert run(["snap-push", rec_id_of(ledger_root), "--dry-run"]) == 2
 
+    def test_a_creative_folder_holding_neither_an_mp4_nor_a_jpg(self, ledger_root):
+        # Video support (2026-08-28) made the asset lookup try two names. The guard
+        # has to fire when BOTH are absent, not just when the jpg is.
+        run(propose_argv(ledger_root))
+        (ledger_root / "creatives" / "test-asset" / "asset-a.jpg").unlink()
+        assert not (ledger_root / "creatives" / "test-asset" / "asset-a.mp4").exists()
+        assert run(["snap-push", rec_id_of(ledger_root), "--dry-run"]) == 2
+
+
+class TestVideoCreatives:
+    """A creative folder holding asset-a.mp4 is pushed as a Snap VIDEO media.
+
+    Snap's WEB_VIEW creative takes either an image or a video as its top snap, so
+    the only thing that changes is the media type registered at upload.
+    """
+
+    def test_an_mp4_is_accepted_and_still_needs_its_qa_pass(self, ledger_root):
+        run(propose_argv(ledger_root))
+        creative = ledger_root / "creatives" / "test-asset"
+        creative.joinpath("asset-a.mp4").write_bytes(b"\x00\x00\x00 ftypisom")
+        creative.joinpath("qa.md").write_text("Verdict: `regenerate`\n")
+        # The video path must not become a way around the QA gate.
+        assert run(["snap-push", rec_id_of(ledger_root), "--dry-run"]) == 2
+
+    def test_an_mp4_wins_over_a_jpg_in_the_same_folder(self, ledger_root):
+        run(propose_argv(ledger_root))
+        creative = ledger_root / "creatives" / "test-asset"
+        creative.joinpath("asset-a.mp4").write_bytes(b"\x00\x00\x00 ftypisom")
+        assert creative.joinpath("asset-a.jpg").exists()
+        assert run(["snap-push", rec_id_of(ledger_root), "--dry-run"]) == 0
+
     def test_a_record_that_is_already_live(self, ledger_root):
         # Pushing twice would create duplicates against a record holding real ids.
         run(propose_argv(ledger_root))

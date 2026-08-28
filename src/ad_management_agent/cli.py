@@ -379,10 +379,15 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
 
-    asset = ledger.root / fm["creative_ref"] / "asset-a.jpg"
-    qa = ledger.root / fm["creative_ref"] / "qa.md"
+    # Video first: a creative folder holding asset-a.mp4 is a video ad, and the only
+    # thing that changes downstream is the media type Snap registers.
+    cdir = ledger.root / fm["creative_ref"]
+    asset, media_type = (cdir / "asset-a.mp4", "VIDEO")
     if not asset.exists():
-        print(f"error: creative not found at {asset}", file=sys.stderr)
+        asset, media_type = (cdir / "asset-a.jpg", "IMAGE")
+    qa = cdir / "qa.md"
+    if not asset.exists():
+        print(f"error: no creative at {cdir}/asset-a.mp4 or asset-a.jpg", file=sys.stderr)
         raise SystemExit(2)
     if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
         print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10",
@@ -472,7 +477,7 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
                                   pixel_id=(config.get("snap") or {}).get("pixel_id"))
     print(f"ad squad  created {squad['id']}")
 
-    media = client.upload_media(f'{fm["ad_name"]}_MEDIA', asset)
+    media = client.upload_media(f'{fm["ad_name"]}_MEDIA', asset, media_type=media_type)
     print(f"media     uploaded {media['id']}")
 
     # utm_id needs the ad id, which does not exist yet; the URL is rewritten below.
