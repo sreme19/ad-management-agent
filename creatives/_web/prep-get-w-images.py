@@ -6,6 +6,45 @@ Writes into pocket-dating-coach/static/get-w/. That repo holds the page; this on
 holds the plates and the rules they were made under, so the derivation lives here
 and only the output crosses over. Re-run to re-cut.
 
+ROUND 5 (2026-08-28, Sree on the live page: "this picture on the landing page
+looks pretty bad"). The round-2 hero was a woman sitting still on a sofa — round 2
+fixed the face and left the body seated, and the props (plant, framed prints, beige
+sofa) could sell insurance. Two Google Flow plates from
+`_bakeoff/round-05-getw-genz/candidates/` replace it, and the page shows more than
+one person for the first time:
+
+  hero.jpg   <- flow-group-three-1.jpeg  three women mid-conversation on cafe steps
+  moment.jpg <- flow-moment-street-1.jpeg  @Ira crossing a Bangalore street, laughing
+                back over her shoulder (replaces the round-2 moment)
+
+shortlist.jpg is unchanged — round 5 did not re-shoot the phones plate, so it is
+still the round-2 composite and main() rebuilds it from there.
+
+BOTH PLATES ARRIVE 1536x2752 (9:16), NOT 3:4. Flow's image default is 9:16 and the
+preflight in `_bakeoff/round-05-getw-genz/prompts.md` was written after these were
+generated. Both are cut to 1536x1920 (4:5) at full width, no scaling.
+
+WATERMARK HANDLING, per plate. Flow stamps the same translucent four-point star
+bottom-right that Gemini does.
+  group:  star at (1405-1442, 2617-2657) -> bottom crop at y=2586 drops it, along
+          with a repeating tyre-tread artefact in the pavement below y=2650. The
+          cut lands on the step under their sandals (lowest sandal pixel y=2522).
+  street: star at (1400-1520, 2504-2656) -> bottom crop at y=2490 drops it. Her
+          lowest shoe pixel is y=2308, so the cut clears her feet by 180px.
+Cropped out, never inpainted — no invented pixels, the same standard rounds 1 and
+2 held to.
+
+THE GROUP PLATE ALSO ARRIVED WITH A PASTED CREAM RECTANGLE over the top-left,
+x 0-1334 by y 0-666, hard-edged (row-seam score 41.6 at y=666 against 3.5 for the
+next strongest row in the plate). The prompt asked for "clean cream wall across the
+top third for a headline" and Flow supplied a literal flat fill rather than a wall,
+which is the same class of miss as `_bakeoff/tools.md` #9. The top crop at y=666
+removes it exactly, and losing it costs nothing: the page sets its own headline in
+HTML above the image, so the plate never needed in-frame type space at all.
+
+Those two cuts are what make 4:5 fall out on its own — 2586-666 = 1920 on the group
+plate, and 2490-570 = 1920 on the street plate.
+
 ROUND 2 (2026-08-27, Sree: "the images are not the best", Bumble as reference).
 The round-1 cuts read static: every frame in the Bumble reference set catches
 someone mid-motion or mid-laugh, and ours held still. Three new Gemini plates from
@@ -86,6 +125,17 @@ def face(size, weight="Bold"):
     except Exception:
         pass
     return f
+
+
+def for_web(im, width=1080):
+    """Downscale to a sane delivery width. Rounds 1 and 2 never needed this — their
+    plates arrived ~900px wide. Flow returns 1536, and a 480KB hero on the paid
+    destination is an LCP regression on the mobile networks this page is bought for.
+    1080 is 2x the widest column /get/w renders the image in."""
+    if im.width <= width:
+        return im
+    h = round(im.height * width / im.width)
+    return im.resize((width, h), Image.LANCZOS)
 
 
 def crop_ratio(im, top, height):
@@ -349,8 +399,39 @@ def cover_solid(im, box):
 
 R2 = SRC / "_bakeoff/round-02-getw-bumble/candidates"
 
+R5 = SRC / "_bakeoff/round-05-getw-genz/candidates"
+
 
 def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    # Hero — the group shot. Top crop at 666 removes the pasted cream rectangle,
+    # bottom crop at 2586 removes the Flow star and the pavement artefact under
+    # it. 1920 tall at full width: 4:5, no scaling.
+    group = Image.open(R5 / "flow-group-three-1.jpeg").convert("RGB")
+    for_web(crop_ratio(group, 666, 1920)).save(OUT / "hero.jpg", **JPEG)
+
+    # Moment — bottom crop at 2490 drops the star while clearing her feet by
+    # 180px; the top comes off dead sky, which tightens the frame on her.
+    street = Image.open(R5 / "flow-moment-street-1.jpeg").convert("RGB")
+    for_web(crop_ratio(street, 570, 1920)).save(OUT / "moment.jpg", **JPEG)
+
+    # Shortlist — unchanged from round 2; rebuilt here so one command still
+    # produces the whole set.
+    phones = Image.open(R2 / "gemini-phones-1.png").convert("RGB")
+    composed, _ = composite_screen(phones, shortlist_render(), seed=(460, 580))
+    composed.crop((0, 0, 928, 970)).save(OUT / "shortlist.jpg", **JPEG)
+
+    for name in ("hero.jpg", "moment.jpg", "shortlist.jpg"):
+        f = OUT / name
+        im = Image.open(f)
+        print(f"{name:14} {im.size[0]}x{im.size[1]}  {f.stat().st_size // 1024} KB")
+
+
+
+
+def main_r2():
+    """Round-2 derivation, kept for provenance. Produced the 2026-08-27 evening set."""
     OUT.mkdir(parents=True, exist_ok=True)
 
     # Hero — bottom crop at 1050 drops the watermark; cut lands mid-forearm.

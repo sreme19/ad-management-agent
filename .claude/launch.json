@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "get-w",
+      "description": "pocket-dating-coach Vite dev server. This repo holds the /get/w plates and their derivation; that repo holds the page. npm --prefix points at it so the landing page can be previewed from here.",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/performek5/Desktop/Code/pocket-dating-coach",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5174"
+      ],
+      "port": 5174,
+      "url": "http://localhost:5174"
+    }
+  ]
+}

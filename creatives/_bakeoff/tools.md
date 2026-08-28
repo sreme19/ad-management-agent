@@ -78,6 +78,28 @@ Every line here cost a round or a QA concern to learn. Sources:
     crops. Keeping that paragraph while loosening everything else is what turned
     round 4 from dull into shippable.
 
+### Stills, learned on round 05
+
+18. **Never ask a landing-page plate for type space.** "Clean cream wall across
+    the top third for a headline" came back as a literal pasted cream rectangle
+    with a hard edge, over a third of the frame. The page sets its headline in
+    HTML above the image, so the plate does not need in-frame type space at all —
+    ask for the scene, crop to ratio afterwards. (An *ad* plate is different:
+    `creative-generation.md` §2 still wants deliberate empty space there, because
+    the type is burned into the export.)
+19. **The image default is 9:16 too, and it is a separate control from video.**
+    Both round-05 plates arrived 1536x2752 when 3:4 was wanted. Set *Agent
+    settings → Image generation default* before generating, not after.
+20. **Flow stamps the same four-point star Gemini does**, bottom-right, roughly
+    40px across and about 100px up from the bottom edge on a 2752-tall plate.
+    Budget a bottom crop for it. Cropping removes the visible mark only — SynthID
+    stays in the pixels, which is correct and should not be attacked.
+21. **"No men in frame" does not hold in a crowd scene.** The round-05 café plate
+    put four blurred men behind the subjects despite an explicit exclusion, and
+    unlike round 02's version no crop reached them. If a plate must be clean of
+    men, put the subjects somewhere a background crowd cannot exist — a rooftop, a
+    doorway, an empty street — rather than relying on the exclusion line.
+
 ### Workflow you probably aren't using
 
 12. **Fix one clip, don't regenerate all of it.** Select the clip, describe the
