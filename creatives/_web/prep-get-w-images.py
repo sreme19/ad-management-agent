@@ -416,13 +416,23 @@ def main():
     street = Image.open(R5 / "flow-moment-street-1.jpeg").convert("RGB")
     for_web(crop_ratio(street, 570, 1920)).save(OUT / "moment.jpg", **JPEG)
 
+    # Together — the Grok plate. Sree overrode two hard gates to put this on the
+    # page (see the round-05 ledger): it is not India, and creative-generation.md
+    # section 1 reads three styled women walking at the lens as the frame's
+    # object. That call is his to make — section 1's verdict is "escalate", which
+    # means the app owner decides — and it is recorded, not hidden.
+    # Bottom crop at 1730 drops the Grok wordmark at (883-1003, 1739-1769); the
+    # top comes off dead sky and brickwork.
+    together = Image.open(R5 / "grok-group-wide-1.jpg").convert("RGB")
+    for_web(crop_ratio(together, 180, 1550)).save(OUT / "together.jpg", **JPEG)
+
     # Shortlist — unchanged from round 2; rebuilt here so one command still
     # produces the whole set.
     phones = Image.open(R2 / "gemini-phones-1.png").convert("RGB")
     composed, _ = composite_screen(phones, shortlist_render(), seed=(460, 580))
     composed.crop((0, 0, 928, 970)).save(OUT / "shortlist.jpg", **JPEG)
 
-    for name in ("hero.jpg", "moment.jpg", "shortlist.jpg"):
+    for name in ("hero.jpg", "moment.jpg", "together.jpg", "shortlist.jpg"):
         f = OUT / name
         im = Image.open(f)
         print(f"{name:14} {im.size[0]}x{im.size[1]}  {f.stat().st_size // 1024} KB")

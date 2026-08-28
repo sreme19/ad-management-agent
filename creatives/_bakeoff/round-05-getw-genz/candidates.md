@@ -14,6 +14,7 @@ Slots 1, 3, 5 and 6 are still unshot.
 |---|---|---|---|---|---|
 | `flow-group-three-1.jpeg` | group-three | **unrecorded** | **unrecorded** | not scored | **SHIPPED** as `hero.jpg` |
 | `flow-moment-street-1.jpeg` | moment-street | **unrecorded** | **unrecorded** | not scored | **SHIPPED** as `moment.jpg` |
+| `grok-group-wide-1.jpg` | group-wide | Grok | — | eliminated at the gates | **SHIPPED as `together.jpg` on Sree's override** — see below |
 
 Neither carries a rubric score, and this session cannot supply one — it wrote the
 prompts, and `creative-generation.md` §10 puts the judging in a second pass. What
@@ -93,3 +94,61 @@ and are now wrong for 4:5 — updated in
 `pocket-dating-coach/src/routes/get/[[audience=aud]]/+page.svelte`, along with the
 hero's alt text, which still described one woman at home. **Uncommitted in both
 repos.**
+
+### `grok-group-wide-1` — eliminated at the hard gates
+
+Brought in by Sree 2026-08-28 with "use this image somewhere." It is a good
+photograph and it fails two of this page's hard gates. Recorded here rather than
+quietly dropped, because a candidate with no verdict taught nothing — and because
+one of the two failures is a gate whose verdict is *escalate*, which is the app
+owner's call and never a quiet edit.
+
+Three women walking a sidewalk in golden hour, 1008x1792. What kills it:
+
+1. **It is not India.** Brick warehouse frontage, an autumn maple in leaf,
+   US-pattern sidewalk and planters. `tools.md` #6 records that Flow and its
+   siblings default Western and that the city has to be named; this plate is the
+   defect that rule exists for. The cast does not read Indian either, against
+   Sree's own 2026-08-17 constraint ("Indian models") in
+   `compliance.md` §6.2.
+2. **`creative-generation.md` §1 — woman as the object of the frame.** Three
+   styled women walk toward the lens in a line, cropped tops, nobody speaking to
+   anybody, every gaze past the camera. That is a lookbook frame. §1's whole
+   diagnosis of the 98/2 split is that a women-targeted ad depicting desirable
+   women recruits men, and `rubric.md` puts this gate's verdict at
+   **out -> escalate**, not re-cut.
+
+Two lesser marks: the Grok wordmark sits bottom-right (croppable, so not
+disqualifying on its own per the gate table), and the palette is golden khaki and
+brown rather than the cream ground Sree fixed on 2026-08-27.
+
+**What is worth keeping from it:** the composition. Three women abreast, walking,
+mid-stride, warm low sun — that is slot 3 `group-wide` in `prompts.md`, which is
+still unshot, and this plate is a better statement of the shape than the prompt
+text is. The move is to re-run slot 3 with this framing, the saved cast, and
+Bangalore named explicitly.
+
+#### The override, recorded
+
+The two failures above were put to Sree with the gate readings spelled out, and
+he chose to ship it anyway. That is his call to make and the rule says so:
+`rubric.md` puts a §1 failure at **out → escalate**, and `creative-generation.md`
+§10 defines escalate as "the app owner's decision, never a quiet edit." This is
+the decision, taken in the open.
+
+What shipped: `together.jpg`, 1008x1550, in a section of its own directly above
+the closing CTA on `/get/w`, captioned with a sanctioned `creative-style.md`
+line ("The AI does the searching. You do the meeting."). The Grok wordmark at
+(883-1003, 1739-1769) is cropped off, not inpainted. The footer's existing
+AI-imagery label already covers it for §6.2.
+
+What is still true and was not made false by the override:
+- The scene is not India and the cast does not read Indian. If `/get/w` ever
+  gets a consistency pass, this is the frame that will look imported.
+- §1's diagnosis of the 98/2 split is a claim about *delivery*, not taste. If
+  the women's ad sets start skewing male again after this, this image is the
+  first thing to test out. That is the falsifiable version of the objection and
+  it costs nothing to check against `ad-audit`.
+- Slot 3 `group-wide` in `prompts.md` remains unshot. Re-running it with this
+  plate's composition — three abreast, mid-stride, low warm sun — and Bangalore
+  named would give the same frame without either failure.
