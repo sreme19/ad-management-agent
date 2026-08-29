@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -106,6 +107,10 @@ COLLECTIONS = {
     "adcreatives",
     "adimages",
     "advideos",
+    # Lead forms are created on the PAGE, not the ad account, but the guard walks
+    # every outbound payload regardless of host object — a form carries no budget
+    # and no status, so this entry only classifies its POST as a create.
+    "leadgen_forms",
 }
 
 
@@ -551,6 +556,203 @@ class MetaClient:
                 "duplicate in Ads Manager first. See rules/naming.md."
             )
         return hits[0] if hits else None
+
+    # ---- lead ads (OUTCOME_LEADS / instant forms) --------------------------
+    #
+    # Added 2026-08-29 at the app owner's request, for the MOVE-ON lead funnel
+    # (rec-2026-08-29-moveon-lead-w1824-meta / -w2530-meta). create_adset's own
+    # docstring said a different optimisation goal "is a new code path when someone
+    # builds it, not a flag on this one" — this is that code path, built to the same
+    # SPEC #3 shape: everything created PAUSED, every request through _call's guard,
+    # nothing here can enable, delete, or change a live budget.
+
+    def page_token(self) -> str:
+        """Derive a Page access token from the system-user token.
+
+        Lead forms live on the Page, and Meta refuses to create one with an
+        ad-account token: the POST needs a token whose subject IS the page. A system
+        user that has the page assigned can mint one by reading the page's own
+        `access_token` field. If that field comes back empty the assignment is
+        missing, and the fix is in Business Settings, not here — or create the form
+        by hand in Ads Manager and pass --form-id to skip this entirely.
+        """
+        res = self.get(f"/{self.cfg['page_id']}", fields="access_token")
+        token = res.get("access_token")
+        if not token:
+            raise MetaError(
+                "the system-user token cannot act as the Page: reading the page's "
+                "access_token returned nothing.\nEither assign the riteangle Page to "
+                "the riteangle-api system user (Business Settings -> Users -> System "
+                "users -> Assign assets, with Manage permission), or create the "
+                "instant form by hand in Ads Manager and rerun with --form-id."
+            )
+        return token
+
+    def _call_as_page(self, method: str, path: str, payload: dict) -> dict:
+        """One request authorised as the Page. Same guard, different bearer.
+
+        Deliberately funnels through the same _safety_violations check as _call —
+        a page-authorised request is still this module's outbound traffic, and the
+        paused-only rule does not care which token carries a violation.
+        """
+        violations = _safety_violations(method, path, payload)
+        if violations:
+            raise MetaSafetyError(
+                f"REFUSED: {method} {path} would break the paused-only rule.\n"
+                + "\n".join(f"  - {v}" for v in violations)
+            )
+        data = urllib.parse.urlencode(
+            {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
+             for k, v in payload.items()}
+        ).encode()
+        req = urllib.request.Request(
+            f"{API}{path}", data=data, method=method.upper(),
+            headers={"Authorization": f"Bearer {self.page_token()}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                body = r.read()
+                return json.loads(body) if body else {}
+        except urllib.error.HTTPError as e:
+            raise MetaError(f"{method} {path} (as page) -> HTTP {e.code}\n"
+                            f"{e.read().decode()[:800]}") from e
+
+    def find_lead_form(self, name: str) -> dict | None:
+        """Exact-name lookup on the page, so a retry resumes instead of duplicating.
+
+        Same reason find_adset exists: this push has no rollback, and a run that
+        dies after the form is created must reuse it, not mint a sibling.
+        """
+        res = self.get(f"/{self.cfg['page_id']}/leadgen_forms",
+                       fields="id,name,status,thank_you_page")
+        hits = [f for f in res.get("data", []) if f.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h["id"] for h in hits)
+            raise MetaError(
+                f"{len(hits)} lead forms on the page are named {name!r} ({ids}). "
+                "Refusing to guess — archive the duplicates in Ads Manager first."
+            )
+        return hits[0] if hits else None
+
+    def create_lead_form(self, *, name: str, privacy_url: str,
+                         thank_you_url: str) -> dict:
+        """Create the instant form: first name, phone, email, and the handoff.
+
+        The thank-you page is the funnel hinge — its button is what carries her to
+        /get/w-apply with the UTMs and ra_lead={{lead_id}}. The macro is the ONE
+        value that stays a macro (the lead id does not exist until she submits);
+        everything else in the URL is a literal, per rules/tracking.md and the
+        2026-08-21 incident. Whether Meta actually resolves {{lead_id}} here is
+        verified by the mandatory end-to-end test submission before enabling —
+        never assume it, because /get/w-apply would store the literal braces.
+        """
+        return self._call_as_page("POST", f"/{self.cfg['page_id']}/leadgen_forms", {
+            "name": name,
+            "questions": [
+                {"type": "FIRST_NAME"},
+                {"type": "PHONE"},
+                {"type": "EMAIL"},
+            ],
+            "privacy_policy": {"url": privacy_url},
+            "thank_you_page": {
+                "title": "Bas ek step baaki hai",
+                "body": "Aapka apply almost complete hai.",
+                "button_type": "VIEW_WEBSITE",
+                "button_text": "Complete karo",
+                "website_url": thank_you_url,
+            },
+        })
+
+    def create_lead_adset(self, *, name, campaign_id, targeting, daily_budget_inr,
+                          start_time, end_time) -> dict:
+        """Create the ad set for an instant-form campaign, PAUSED.
+
+        Differs from create_adset in exactly the fields the objective forces:
+        destination ON_AD (the form opens inside Meta; there is no website
+        destination at the ad-set level), optimisation LEAD_GENERATION, and
+        promoted_object carrying the page — required here where create_adset's
+        docstring records it must NOT be sent for LANDING_PAGE_VIEWS. Same INR
+        guard, same paise conversion, same account-level creation path.
+        """
+        self.require_inr()
+        return self.post(f"/{self.account_path}/adsets", {
+            "name": name,
+            "campaign_id": campaign_id,
+            "status": "PAUSED",
+            "targeting": targeting,
+            "optimization_goal": "LEAD_GENERATION",
+            "billing_event": "IMPRESSIONS",
+            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+            "daily_budget": round(daily_budget_inr * MINOR),
+            "destination_type": "ON_AD",
+            "promoted_object": {"page_id": str(self.cfg["page_id"])},
+            "start_time": start_time,
+            "end_time": end_time,
+        })
+
+    def upload_video(self, path: Path) -> str:
+        """Upload a video and wait until Meta has finished processing it.
+
+        Returns the video id only once status reads `ready`: a creative built on a
+        still-processing video fails with an error that names the video, not the
+        problem, and the 2026-08-28 push failures were exactly this class of
+        misleading mid-push error. Polling is bounded so a stuck encode fails loudly
+        rather than hanging the push.
+        """
+        boundary = uuid.uuid4().hex
+        ctype = mimetypes.guess_type(path.name)[0] or "video/mp4"
+        body = b"".join([
+            f"--{boundary}\r\n".encode(),
+            f'Content-Disposition: form-data; name="source"; filename="{path.name}"\r\n'.encode(),
+            f"Content-Type: {ctype}\r\n\r\n".encode(),
+            path.read_bytes(), b"\r\n", f"--{boundary}--\r\n".encode(),
+        ])
+        req = urllib.request.Request(
+            f"{API}/{self.account_path}/advideos", data=body, method="POST",
+            headers={"Authorization": f"Bearer {self.cfg['access_token']}",
+                     "content-type": f"multipart/form-data; boundary={boundary}"})
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                res = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            raise MetaError(f"video upload -> HTTP {e.code}\n{e.read().decode()[:500]}") from e
+        vid = res.get("id")
+        if not vid:
+            raise MetaError(f"video upload returned no id: {json.dumps(res)[:300]}")
+        for _ in range(60):  # up to ~5 minutes
+            status = (self.get(f"/{vid}", fields="status").get("status") or {})
+            state = status.get("video_status")
+            if state == "ready":
+                return vid
+            if state == "error":
+                raise MetaError(f"video {vid} failed Meta-side processing: {status}")
+            time.sleep(5)
+        raise MetaError(f"video {vid} still processing after 5 minutes — rerun the push; "
+                        "find_ad/find_adset make the retry resume rather than duplicate.")
+
+    def create_lead_creative(self, *, name, video_id, thumbnail_hash, message,
+                             form_id) -> dict:
+        """Create the video creative that opens the instant form.
+
+        video_data instead of link_data, and the call to action carries the form id
+        — that binding, not any ad-set field, is what makes tapping the ad open the
+        form. Thumbnail is required by Meta for video creatives; it arrives as an
+        image_hash from the same upload_image path the link ads use.
+        """
+        return self.post(f"/{self.account_path}/adcreatives", {
+            "name": name,
+            "object_story_spec": {
+                "page_id": str(self.cfg["page_id"]),
+                "video_data": {
+                    "video_id": video_id,
+                    "image_hash": thumbnail_hash,
+                    "message": message,
+                    "call_to_action": {
+                        "type": "APPLY_NOW",
+                        "value": {"lead_gen_form_id": str(form_id)},
+                    },
+                },
+            },
+        })
 
     def attach_tracked_creative(self, *, ad_id: str, creative: dict, url_tags: str,
                                 name: str) -> dict:

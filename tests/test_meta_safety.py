@@ -372,3 +372,57 @@ class TestEveryLevelIsResumable:
         import inspect
         src = inspect.getsource(getattr(metaapi.MetaClient, finder))
         assert "len(hits) > 1" in src and "raise MetaError" in src
+
+
+class TestTheLeadPathIsGuardedToo:
+    """The lead-ads path (2026-08-29) must not be a second, softer door.
+
+    `meta-push-lead` adds two things that could have bypassed the guard: a request
+    authorised as the PAGE rather than the ad account (`_call_as_page`), and a new
+    collection (`leadgen_forms`). These assert both stay inside the same rule —
+    a refused request must never reach the network regardless of which token would
+    have carried it.
+    """
+
+    def test_call_as_page_refuses_before_any_network_io(self, monkeypatch):
+        client = metaapi.MetaClient({
+            "access_token": "t", "ad_account_id": "1", "page_id": "2"})
+
+        def boom(*a, **k):  # any attempt to open a connection fails the test
+            raise AssertionError("a refused request reached the network")
+        monkeypatch.setattr(metaapi.urllib.request, "urlopen", boom)
+        # page_token() would also hit the network; the guard must fire first.
+        monkeypatch.setattr(client, "page_token", lambda: "page-token")
+
+        with pytest.raises(metaapi.MetaSafetyError):
+            client._call_as_page("POST", "/2/leadgen_forms",
+                                 {"name": "x", "status": "ACTIVE"})
+
+    def test_creating_a_lead_form_is_allowed(self):
+        # The real payload create_lead_form sends: no status, no budget — clean.
+        assert not violations("POST", "/2/leadgen_forms", {
+            "name": "RA_LEAD_WOMEN_18-24_CASUAL_MOVEON-LEAD_PROV",
+            "questions": [{"type": "FIRST_NAME"}, {"type": "PHONE"}, {"type": "EMAIL"}],
+            "privacy_policy": {"url": "https://www.riteangle.dating/privacy-policy"},
+            "thank_you_page": {
+                "title": "Bas ek step baaki hai",
+                "button_type": "VIEW_WEBSITE",
+                "website_url": "https://www.riteangle.dating/get/w-apply?utm_source=fb&ra_lead={{lead_id}}",
+            },
+        })
+
+    def test_leadgen_forms_posts_are_classified_as_creates(self):
+        # If this ever regresses, a form POST gets treated as an update and any
+        # budget-shaped key in it would be refused — fails closed, but noisily
+        # wrong. Assert the classification directly.
+        assert metaapi._is_create("POST", "/2/leadgen_forms")
+
+    def test_creating_a_paused_lead_adset_with_a_budget_is_allowed(self):
+        assert not violations("POST", CREATE_ADSETS, {
+            "name": "WOMEN_18-24_CASUAL_MOVEON-LEAD",
+            "status": "PAUSED",
+            "optimization_goal": "LEAD_GENERATION",
+            "destination_type": "ON_AD",
+            "promoted_object": {"page_id": "2"},
+            "daily_budget": 30000,
+        })

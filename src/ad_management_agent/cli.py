@@ -590,6 +590,252 @@ def _gate_campaign_budget_optimization(caps: dict, *, rec_id: str) -> None:
     raise SystemExit(2)
 
 
+def cmd_meta_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Create a proposed LEAD record on Meta, PAUSED, and diff it back.
+
+    The lead-ads sibling of cmd_meta_push, built 2026-08-29 at the app owner's
+    request (SPEC #3's shape: paused-only, guard at the transport, read-back). Where
+    it differs from the link push, the objective forces it:
+
+      * The creative is a VIDEO the app owner finished outside this repo, so its
+        path arrives as --video rather than as creative_ref/asset-a.jpg. The QA gate
+        stays: creative_ref/qa.md must record a `pass`.
+      * There is no destination URL at the ad level — the form opens inside Meta.
+        rules/tracking.md's five parameters ride the form's thank-you button URL
+        instead, plus ra_lead={{lead_id}}, the one deliberate macro.
+      * The thank-you URL needs the AD id, and the ad cannot exist before the form.
+        Same resolution as attach_tracked_creative: a provisional form and creative
+        get the ad made, then a tracked form carrying the real id is built and the
+        ad is repointed. The provisional pair is left behind, unused — a spare
+        object is the cheaper failure, as before.
+    """
+    config = load_config()
+    rec = ledger.find(args.rec_id)
+    fm = rec.front_matter
+
+    if fm.get("network") != "meta":
+        print(f"error: {args.rec_id} is network={fm.get('network')!r}, not meta", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        networkreg.require_creation(ledger.root / "rules", "meta", mode="paused-only")
+    except networkreg.NetworkError as exc:
+        _fail(exc)
+    if fm.get("status") != "proposed":
+        print(f"error: {args.rec_id} is {fm.get('status')!r}; push expects 'proposed'.",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+    # The destination gate still runs even though the ad itself has no website
+    # destination: the thank-you button is the moment paid traffic gets pointed at
+    # a page, and that is exactly what the gate exists to check.
+    try:
+        destinations.check(ad_set_name=fm["ad_set_name"],
+                           destination_url=fm["destination_url"],
+                           rules_dir=ledger.root / "rules")
+    except destinations.DestinationGateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    video = Path(args.video).expanduser()
+    if not video.exists():
+        print(f"error: video not found at {video}", file=sys.stderr)
+        raise SystemExit(2)
+    qa = ledger.root / fm["creative_ref"] / "qa.md"
+    if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
+        print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10\n"
+              "(the finished video needs its own independent pass; compliance.md sec 8)",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+    start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
+    end = start + _dt.timedelta(days=int(fm["duration_days"]))
+    def iso(d):
+        return d.strftime("%Y-%m-%dT%H:%M:%S+0000")
+
+    budget = float(fm["budget_cap_inr_per_day"])
+    spec = fm.get("targeting")
+    if not spec:
+        print(f"error: {args.rec_id} has no structured `targeting` block.", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        targetingspec.validate(spec)
+        targetingspec.check_matches_ad_set_name(spec, fm["ad_set_name"])
+    except targetingspec.TargetingError as exc:
+        _fail(exc)
+    targeting = targetingspec.to_meta(spec)
+
+    privacy_url = "https://www.riteangle.dating/privacy-policy"
+
+    plan = [
+        ("campaign   ", f'{fm["campaign_name"]}  OUTCOME_LEADS'),
+        ("ad set     ", (f'{fm["ad_set_name"]}  Rs {budget:.0f}/day x '
+                         f'{fm["duration_days"]}d, LEAD_GENERATION, instant form (ON_AD)')),
+        ("ad         ", fm["ad_name"]),
+        ("form       ", f'first name + phone + email, privacy={privacy_url}'),
+        ("thank-you  ", f'{fm["destination_url"]}?<utms>&ra_lead={{{{lead_id}}}}'),
+        ("video      ", str(video)),
+        ("targeting  ", targetingspec.describe(spec)),
+    ]
+    print(f"Plan for {args.rec_id} (everything created PAUSED):")
+    for k, v in plan:
+        print(f"  {k}  {v}")
+    if spec.get("regulated_content", True):
+        print("  note         regulated_content has no Meta equivalent and is NOT sent; "
+              "Meta gates dating at the account level instead")
+
+    client = None
+    try:
+        client = metaapi.MetaClient(config.get("meta") or {})
+    except metaapi.MetaError as exc:
+        if not args.dry_run:
+            _fail(exc)
+        print(f"\nnote: no Meta credentials; parent caps NOT checked. ({exc})")
+
+    campaign = None
+    if client is not None:
+        client.require_inr()
+        campaign = client.find_campaign(fm["campaign_name"])
+        if campaign:
+            print(f"\ncampaign  reusing {campaign['id']}")
+        elif args.dry_run:
+            print(f"\ncampaign  {fm['campaign_name']} does not exist yet; would be created "
+                  "new with objective OUTCOME_LEADS")
+        else:
+            campaign = client.create_campaign(fm["campaign_name"], objective="OUTCOME_LEADS")
+            print(f"\ncampaign  created {campaign['id']}")
+
+    if campaign is not None:
+        caps = client.campaign_caps(campaign["id"])
+        _gate_campaign_budget_optimization(caps, rec_id=args.rec_id)
+        _gate_campaign_caps(caps, squad_daily_inr=budget, duration_days=int(fm["duration_days"]),
+                            rec_id=args.rec_id, accept=args.accept_campaign_cap)
+        if not args.dry_run:
+            ledger.record_campaign_caps(args.rec_id, daily_inr=caps.get("daily_inr"),
+                                        lifetime_inr=caps.get("lifetime_inr"), today=_today())
+
+    if args.dry_run:
+        print("\n--dry-run: nothing created.")
+        return
+
+    adset = client.find_adset(fm["ad_set_name"], campaign["id"])
+    if adset:
+        print(f"ad set    reusing {adset['id']} (already existed under this campaign)")
+    else:
+        adset = client.create_lead_adset(name=fm["ad_set_name"], campaign_id=campaign["id"],
+                                         targeting=targeting, daily_budget_inr=budget,
+                                         start_time=iso(start), end_time=iso(end))
+        print(f"ad set    created {adset['id']}")
+
+    print("video     uploading (Meta processes before it is usable; up to ~5 min) ...")
+    video_id = client.upload_video(video)
+    print(f"video     ready id={video_id}")
+
+    # Thumbnail: the wedding laugh, extracted by the operator alongside the render
+    # and named <video>.thumb.jpg — or fall back to the first frame Meta picks by
+    # refusing, because a video creative without image_hash is rejected.
+    thumb = video.with_suffix(".thumb.jpg")
+    if not thumb.exists():
+        print(f"error: thumbnail not found at {thumb} — export one frame (the 14.5s laugh) "
+              "next to the video with that name.", file=sys.stderr)
+        raise SystemExit(2)
+    thumb_hash = client.upload_image(thumb)
+    print(f"thumb     uploaded hash={thumb_hash}")
+
+    def thank_you_url(with_ad_id: str | None) -> str:
+        # rules/tracking.md's params as literals; utm_content (the ad id on Meta) is
+        # only present once the ad exists. ra_lead stays a macro — the one value
+        # that cannot be literal, because the lead does not exist until she submits.
+        base = _utm_query(ledger.root / "rules", "meta", fm["campaign_name"],
+                          adset["id"], with_ad_id or "", fm["ad_name"])
+        if not with_ad_id:
+            # drop the empty utm_content pair rather than sending utm_content=
+            base = "&".join(p for p in base.split("&") if not p.startswith("utm_content="))
+        return f'{fm["destination_url"]}?{base}&ra_lead={{{{lead_id}}}}'
+
+    if args.form_id:
+        form = {"id": str(args.form_id)}
+        print(f"form      using existing {args.form_id} (its thank-you URL is YOURS to "
+              "verify — this push cannot see or fix it)")
+    else:
+        form_name = f'RA_LEAD_{fm["ad_set_name"]}_PROV'
+        form = client.find_lead_form(form_name) or client.create_lead_form(
+            name=form_name, privacy_url=privacy_url,
+            thank_you_url=thank_you_url(None))
+        print(f"form      provisional {form['id']}")
+
+    creative = client.create_lead_creative(
+        name=f'{fm["ad_name"]}_CREATIVE', video_id=video_id, thumbnail_hash=thumb_hash,
+        message=args.message, form_id=form["id"])
+    print(f"creative  created {creative['id']}")
+
+    ad = client.find_ad(fm["ad_name"], adset["id"])
+    if ad:
+        print(f"ad        reusing {ad['id']} (already existed under this ad set)")
+    else:
+        ad = client.create_ad(name=fm["ad_name"], adset_id=adset["id"],
+                              creative_id=creative["id"])
+        print(f"ad        created {ad['id']}")
+
+    if not args.form_id:
+        # Second pass: the form whose thank-you URL carries the real ad id. The ad is
+        # repointed at a new creative bound to it; the provisional pair stays behind.
+        tracked_name = f'RA_LEAD_{fm["ad_set_name"]}_TRACKED'
+        tracked_form = client.find_lead_form(tracked_name) or client.create_lead_form(
+            name=tracked_name, privacy_url=privacy_url,
+            thank_you_url=thank_you_url(ad["id"]))
+        tracked_creative = client.create_lead_creative(
+            name=f'{fm["ad_name"]}_CREATIVE_TRACKED', video_id=video_id,
+            thumbnail_hash=thumb_hash, message=args.message, form_id=tracked_form["id"])
+        client.post(f"/{ad['id']}", {"creative": {"creative_id": str(tracked_creative["id"])}})
+        after = client.get(f"/{ad['id']}", fields="id,status,creative")
+        if (after.get("creative") or {}).get("id") != str(tracked_creative["id"]):
+            print("error: ad did not repoint to the tracked creative — fix by hand in "
+                  "Ads Manager before enabling.", file=sys.stderr)
+            raise SystemExit(2)
+        form = tracked_form
+        print(f"form      tracked {form['id']} (thank-you URL carries the real ad id); "
+              f"provisional pair left behind unused, as with link pushes")
+
+    print("\nRead-back:")
+    adset_live = client.get(
+        f"/{adset['id']}",
+        fields="id,name,status,daily_budget,optimization_goal,billing_event,"
+               "destination_type,targeting,promoted_object")
+    ad_live = client.get(f"/{ad['id']}", fields="id,name,status,creative")
+    form_live = client.get(f"/{form['id']}", fields="id,name,status,thank_you_page")
+    ty_url = (form_live.get("thank_you_page") or {}).get("website_url") or ""
+
+    checks = [
+        ("ad set status", adset_live.get("status"), "PAUSED"),
+        ("ad status", ad_live.get("status"), "PAUSED"),
+        ("daily budget (paise)", adset_live.get("daily_budget"),
+         str(round(budget * metaapi.MINOR))),
+        ("optimisation goal", adset_live.get("optimization_goal"), "LEAD_GENERATION"),
+        ("destination", adset_live.get("destination_type"), "ON_AD"),
+        ("promoted page", str((adset_live.get("promoted_object") or {}).get("page_id")),
+         str((config.get("meta") or {}).get("page_id"))),
+    ]
+    for label, got, want in checks:
+        ok = str(got) == str(want)
+        print(f"  {'ok ' if ok else 'DIFF'}  {label}: {got!r}" + ("" if ok else f" (wanted {want!r})"))
+    for label, got, want in targetingspec.meta_readback_checks(spec, adset_live):
+        ok = str(got) == str(want)
+        print(f"  {'ok ' if ok else 'DIFF'}  targeting {label}: {got!r}" + ("" if ok else f" (wanted {want!r})"))
+    ra_ok = "ra_lead={{lead_id}}" in ty_url and ad["id"] in ty_url
+    print(f"  {'ok ' if ra_ok else 'DIFF'}  thank-you URL carries ra_lead macro + real ad id")
+    print(f"        {ty_url}")
+
+    print(f"""
+Created PAUSED. Before enabling (rules/tracking.md + setup-checklist.md):
+  1. ad-agent log-setup {args.rec_id} --campaign-id {campaign['id']} --ad-set-id {adset['id']} --ad-id {ad['id']}
+  2. ONE end-to-end test: preview the ad, submit the form, tap through, and confirm
+     the marketing_apply_gate row carries a REAL ra_lead — not the literal braces.
+     If it arrives as '{{{{lead_id}}}}', Meta did not resolve the macro and the join
+     design falls back to ad-set-level; do not enable until this is known.
+  3. Delete the test lead in Meta Lead Center afterwards.
+  4. Enabling is a human click in Ads Manager, never this tool.""")
+
+
 def cmd_meta_push(args: argparse.Namespace, ledger: Ledger) -> None:
     """Create a proposed record on Meta, PAUSED, and diff it back.
 
@@ -1590,6 +1836,26 @@ def build_parser() -> argparse.ArgumentParser:
                          "stated deviation rather than a surprise. Does NOT apply to a "
                          "campaign-budget-optimisation parent, which is refused outright")
     sp.set_defaults(func=cmd_meta_push)
+
+    sp = sub.add_parser(
+        "meta-push-lead",
+        help="Create a proposed LEAD recommendation (video + instant form) in Meta, PAUSED, "
+             "then diff it back",
+    )
+    sp.add_argument("rec_id")
+    sp.add_argument("--video", required=True,
+                    help="path to the finished 1080x1920 video; a thumbnail is expected "
+                         "beside it as <video>.thumb.jpg")
+    sp.add_argument("--message", required=True,
+                    help="primary text above the video")
+    sp.add_argument("--form-id", default=None,
+                    help="skip form creation and bind an existing instant form by id — the "
+                         "fallback when the system-user token cannot act as the Page")
+    sp.add_argument("--dry-run", action="store_true",
+                    help="print the plan and create nothing")
+    sp.add_argument("--accept-campaign-cap", action="store_true",
+                    help="create anyway when the parent campaign's cap would bind")
+    sp.set_defaults(func=cmd_meta_push_lead)
 
     sp = sub.add_parser(
         "amend",

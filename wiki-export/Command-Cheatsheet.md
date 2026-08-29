@@ -443,6 +443,40 @@ after the real ad id exists, so there is no `{{ad.id}}` macro left to silently f
 When it finishes it prints the `log-setup` command with the real ids filled in. Run that once you've
 enabled the ad &mdash; the loop is not closed until you do.
 
+## "Create the LEAD version on Meta for me" (video + instant form)
+
+```bash
+ad-agent meta-push-lead rec-2026-08-29-moveon-lead-w1824-meta \
+  --video ~/renders/energy-kahan-jaati-hai-FINAL.mp4 \
+  --message "Ghosting. Fake profiles. Teen hafte ki texting jo kahin nahi jaati." \
+  --dry-run
+```
+
+The lead-ads sibling of `ad-agent meta-push`, added 2026-08-29 for the MOVE-ON lead
+funnel. Same SPEC #3 shape — everything PAUSED, the refusal in `MetaClient._call`,
+read-back-and-diff — with the differences the objective forces:
+
+- **OUTCOME_LEADS** campaign; ad set is `LEAD_GENERATION` / `destination_type ON_AD`
+  with `promoted_object` carrying the page (required here, forbidden on the
+  LANDING_PAGE_VIEWS path — see `create_adset`'s docstring).
+- **The creative is a finished video from outside the repo** (`--video`), with a
+  thumbnail expected beside it as `<video>.thumb.jpg`. The QA gate still reads
+  `creative_ref/qa.md` for a recorded `pass`.
+- **The instant form** (first name / phone / email) is created on the *Page*, which
+  needs the system-user token to act as the Page. When it cannot, create the form by
+  hand in Ads Manager and pass `--form-id` — the push then binds it as-is and its
+  thank-you URL is yours to verify.
+- **The thank-you URL is the tracking**: the ad has no website destination, so
+  `rules/tracking.md`'s params ride the form's button URL, plus `ra_lead={{lead_id}}`,
+  the one deliberate macro. The URL needs the ad id, and the ad cannot exist before
+  the form — so the push makes a provisional form/creative pair, creates the ad, then
+  builds a tracked form carrying the real id and repoints the ad. The provisional pair
+  stays behind unused, the same spare-object trade `meta-push` makes for `url_tags`.
+- **Before enabling**: one end-to-end test submission, and confirm the
+  `marketing_apply_gate` row carries a real `ra_lead` — not the literal braces. If the
+  macro did not resolve, attribution falls back to ad-set level; do not enable until
+  that is known.
+
 ## "This proposal needs correcting before I run it"
 
 ```
