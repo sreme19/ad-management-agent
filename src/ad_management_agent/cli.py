@@ -347,6 +347,99 @@ def _utm_url(rules_dir: Path, network: str, destination: str, campaign_name: str
         rules_dir, network, campaign_name, ad_squad_id, ad_id, ad_name)
 
 
+def cmd_snap_leads(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Manage where Snap delivers lead-form submissions.
+
+    WHY THIS COMMAND EXISTS AT ALL. Snap has no endpoint that lists or downloads
+    submitted leads — the only programmatic route off the platform is a webhook,
+    registered per form. Until one is registered, every lead lives in Ads Manager
+    and is deleted after 90 days. This command registers the destination; it never
+    reads a lead, and no lead PII passes through this repo.
+
+    THE RECEIVER IS IN pocket-dating-coach, deliberately. Leads are contact
+    details; this repo records ad plans and outcomes. The webhook writes to
+    marketing_leads with the service role from inside that app, and the read-only
+    ads_agent_ro role is not granted that table.
+    """
+    # argparse cannot say "required, but only for these actions", and the failure
+    # it produces otherwise is a TypeError deep in a URL f-string. Checked here so
+    # a missing flag reads as a missing flag.
+    needs = {
+        "list": [("--form-id", args.form_id)],
+        "register": [("--form-id", args.form_id), ("--url", args.url)],
+        "test": [("--integration-id", args.integration_id)],
+        "delete": [("--integration-id", args.integration_id)],
+    }
+    missing = [flag for flag, value in needs.get(args.action, []) if not value]
+    if missing:
+        print(f"error: snap-leads {args.action} needs {', '.join(missing)}", file=sys.stderr)
+        raise SystemExit(2)
+
+    if args.action == "register" and not args.url.startswith("https://"):
+        # Snap posts lead PII to this URL. Plain http would put a phone number on
+        # the wire in clear, and Snap's own signature does nothing about that.
+        print("error: --url must be https", file=sys.stderr)
+        raise SystemExit(2)
+
+    config = load_config()
+    client = snapapi.SnapClient(config.get("snap") or {})
+
+    if args.action == "forms":
+        forms = client.list_lead_forms()
+        if not forms:
+            print("no lead forms on this account")
+            return
+        for f in forms:
+            hooks = client.list_lead_webhooks(f.get("id", ""))
+            where = hooks[0].get("webhook_url") if hooks else "-- no webhook, leads stay in Ads Manager"
+            print(f"{f.get('id')}  {f.get('name')}\n    -> {where}")
+        return
+
+    if args.action == "list":
+        hooks = client.list_lead_webhooks(args.form_id)
+        if not hooks:
+            print(f"form {args.form_id} has no webhook integration")
+            return
+        for h in hooks:
+            print(f"{h.get('id')}  {h.get('webhook_url')}")
+        return
+
+    if args.action == "register":
+        integration = client.register_lead_webhook(
+            form_id=args.form_id, webhook_url=args.url)
+        secret = integration.get("hmacSecret") or integration.get("hmac_secret")
+        print(f"registered: {integration.get('id')} -> {args.url}")
+        if secret:
+            # Printed once, on purpose. Snap does not return it from the list
+            # endpoint later, and the receiver cannot authenticate a single
+            # delivery without it. It is NOT written to the ledger or to any file
+            # here: this repo's records are committed to git, and this is a
+            # signing key.
+            print()
+            print("hmac secret (shown once — Snap will not return it again):")
+            print(f"  {secret}")
+            print()
+            print("Set it on the receiver before the first lead arrives, or every")
+            print("delivery is rejected 401 and retried until it expires:")
+            print("  vercel env add SNAP_LEAD_HMAC_SECRET production")
+        print()
+        print("Snap does NOT backfill. Leads submitted before now exist only in the")
+        print("Ads Manager export, and Snap deletes them after 90 days.")
+        return
+
+    if args.action == "test":
+        client.test_lead_webhook(args.integration_id)
+        print(f"test delivery fired at integration {args.integration_id}")
+        print("check the receiver's logs — a 401 there means the hmac secret does not match")
+        return
+
+    if args.action == "delete":
+        client.delete_lead_webhook(args.integration_id)
+        print(f"deleted integration {args.integration_id}")
+        print("leads submitted from now on are NOT queued — they stay in Ads Manager only")
+        return
+
+
 def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
     config = load_config()
     rec = ledger.find(args.rec_id)
@@ -1983,6 +2076,21 @@ def build_parser() -> argparse.ArgumentParser:
                          "showing as an open loose end")
     _add_targeting_flags(sp, required=True)
     sp.set_defaults(func=cmd_propose)
+
+    sp = sub.add_parser(
+        "snap-leads",
+        help="Register/inspect where Snap delivers lead-form submissions (webhook, per form)",
+    )
+    sp.add_argument("action", choices=["forms", "list", "register", "test", "delete"],
+                    help="forms: every lead form and where its leads go. "
+                         "register: point one form at the receiver. "
+                         "test: ask Snap to fire a sample delivery. "
+                         "delete: stop delivery for a form")
+    sp.add_argument("--form-id", help="required by list and register")
+    sp.add_argument("--url", help="receiver URL, required by register "
+                                  "(e.g. https://<host>/api/marketing/snap-lead)")
+    sp.add_argument("--integration-id", help="required by test and delete")
+    sp.set_defaults(func=cmd_snap_leads)
 
     sp = sub.add_parser(
         "snap-push",

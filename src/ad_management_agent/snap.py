@@ -551,3 +551,68 @@ class SnapClient:
             "ad_squad_id": ad_squad_id, "creative_id": creative_id,
             "name": name, "type": "REMOTE_WEBPAGE", "status": "PAUSED",
         }]}), "ads")
+
+    # ---- lead delivery ---------------------------------------------------
+    #
+    # HOW LEAD DATA ACTUALLY LEAVES SNAP. There is no endpoint that lists or
+    # downloads submitted leads. The Marketing API exposes form METADATA only;
+    # submissions are delivered by webhook, one integration per form, and Snap
+    # deletes leads after 90 days. So this section registers a destination — it
+    # never fetches a lead, and no method here ever sees lead PII.
+    #
+    # WHY THIS DOES NOT WEAKEN DECISION #3. Every call below is scoped to
+    # /lead_gen/* — it creates no campaign, ad squad, creative or ad, carries no
+    # status and no budget, and cannot start spend. The `_call` safety check still
+    # runs on the one POST, and passes because there is nothing in the payload for
+    # it to refuse. Registering a webhook changes where leads go, not what runs.
+
+    def delete(self, path: str) -> dict:
+        return self._call("DELETE", path)
+
+    def list_lead_forms(self) -> list[dict]:
+        """Every lead form on the account, newest first is NOT guaranteed."""
+        res = self.get(f"/adaccounts/{self.cfg['ad_account_id']}/lead_generation_forms")
+        return [r.get("lead_generation_form") or r
+                for r in res.get("lead_generation_forms", [])]
+
+    def list_lead_webhooks(self, form_id: str) -> list[dict]:
+        res = self.get(f"/lead_gen/forms/{form_id}/integrations?partner_type=PUBLIC_WEBHOOK")
+        return [r.get("integration") or r for r in res.get("integrations", [])]
+
+    def register_lead_webhook(self, *, form_id: str, webhook_url: str) -> dict:
+        """Point one form's submissions at our endpoint.
+
+        Snap allows exactly ONE webhook integration per form, so this refuses when
+        the form already has one rather than racing it. Re-pointing a form is a
+        delete followed by a register, deliberately two steps: the delete is the
+        moment leads stop arriving, and it should be typed on purpose.
+
+        Requires Organization Admin on the ad account. Nothing else — there is no
+        partner approval or lead-data allowlisting to clear.
+
+        The response carries `hmacSecret`, which is how the receiver authenticates
+        every later delivery. It is the same secret for every integration under the
+        account, and Snap shows it here; it is NOT re-readable from the list
+        endpoint later. The caller is responsible for storing it — this method
+        deliberately does not write it anywhere.
+        """
+        existing = self.list_lead_webhooks(form_id)
+        if existing:
+            ids = ", ".join(e.get("id", "?") for e in existing)
+            urls = ", ".join(e.get("webhook_url", "?") for e in existing)
+            raise SnapError(
+                f"form {form_id} already has a webhook integration ({ids} -> {urls}).\n"
+                "Snap allows one per form. Delete it first if you mean to re-point it:\n"
+                f"  ad-agent snap-leads delete --integration-id {ids}"
+            )
+        res = self.post("/lead_gen/integrations/public_webhook",
+                        {"form_id": form_id, "webhook_url": webhook_url})
+        return res.get("integration") or res
+
+    def test_lead_webhook(self, integration_id: str) -> dict:
+        """Ask Snap to fire a sample delivery at the registered URL."""
+        return self.get(f"/lead_gen/integrations/{integration_id}/test")
+
+    def delete_lead_webhook(self, integration_id: str) -> dict:
+        """Stop delivery. Leads submitted while no webhook exists are NOT queued."""
+        return self.delete(f"/lead_gen/integrations/{integration_id}")

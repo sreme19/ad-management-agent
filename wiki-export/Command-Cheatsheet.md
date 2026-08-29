@@ -36,8 +36,11 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 | command | what it does |
 |---|---|
 | `propose` | Record a mode-5 recommendation before you execute it |
+| `snap-leads` | Register/inspect where Snap delivers lead-form submissions (webhook, per form) |
 | `snap-push` | Create a proposed recommendation in Snap Ads Manager, PAUSED, then diff it back |
 | `meta-push` | Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back |
+| `snap-push-lead` | Create a proposed LEAD recommendation (video + on-platform form) on Snap, PAUSED, then diff it back |
+| `meta-push-lead` | Create a proposed LEAD recommendation (video + instant form) in Meta, PAUSED, then diff it back |
 | `amend` | Revise a still-proposed recommendation, with an audit trail of what changed |
 | `log-setup` | Record the real IDs after setting the ad up by hand |
 | `note` | Append a dated note to a record — for things that change mid-run |
@@ -64,6 +67,12 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 ad-agent propose [-h] --network NETWORK --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL [--budget-cap BUDGET_CAP] --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
 ```
 
+#### `snap-leads`
+
+```
+ad-agent snap-leads [-h] [--form-id FORM_ID] [--url URL] [--integration-id INTEGRATION_ID] {forms,list,register,test,delete}
+```
+
 #### `snap-push`
 
 ```
@@ -74,6 +83,18 @@ ad-agent snap-push [-h] [--headline HEADLINE] [--dry-run] [--accept-campaign-cap
 
 ```
 ad-agent meta-push [-h] [--headline HEADLINE] [--message MESSAGE] [--cta CTA] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
+#### `snap-push-lead`
+
+```
+ad-agent snap-push-lead [-h] --video VIDEO [--headline HEADLINE] [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
+#### `meta-push-lead`
+
+```
+ad-agent meta-push-lead [-h] --video VIDEO --message MESSAGE [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
 #### `amend`
@@ -493,6 +514,50 @@ read-back-and-diff — with the differences the objective forces:
   `marketing_apply_gate` row carries a real `ra_lead` — not the literal braces. If the
   macro did not resolve, attribution falls back to ad-set level; do not enable until
   that is known.
+
+## "Where do the leads actually go?" (`snap-leads`)
+
+```bash
+ad-agent snap-leads forms
+ad-agent snap-leads register --form-id <id> --url https://<host>/api/marketing/snap-lead
+ad-agent snap-leads test --integration-id <id>
+```
+
+Added 2026-08-29, when the question "can we ingest Snap leads into our own database"
+turned out to have a different answer than expected. **Snap has no endpoint that lists
+or downloads submitted leads.** The Marketing API exposes form *metadata* only; the one
+programmatic route off the platform is a webhook Snap POSTs per submission, registered
+one per form. Until a form has one, its leads live in Ads Manager and are **deleted
+after 90 days**.
+
+- `forms` lists every lead form and where its leads currently go. A form showing
+  `-- no webhook` is a form whose leads exist nowhere but Snap.
+- `register` points one form at the receiver and prints an **HMAC secret shown once**.
+  Snap does not return it from the list endpoint afterwards, and the receiver rejects
+  every delivery `401` without it. It is deliberately not written to the ledger or any
+  file here — this repo is committed to git and that is a signing key. Set it as
+  `SNAP_LEAD_HMAC_SECRET` on the receiver *before* registering, or the first leads are
+  rejected and retried until they expire.
+- `test` asks Snap to fire a sample delivery, which is how you find out the secret is
+  wrong before a real lead does.
+- `delete` stops delivery. Leads submitted while no webhook exists are **not queued**.
+
+**Registration does not backfill.** Anything already submitted is reachable only through
+the Ads Manager export (Download -> Account leads), and the 90-day window is running on
+it. Export before registering, not after.
+
+**The receiver is not in this repo, on purpose.** It is
+`src/routes/api/marketing/snap-lead/+server.ts` in `pocket-dating-coach`, writing to
+`marketing_leads` with the service role. Leads are contact details; this repo records ad
+plans and outcomes. `ads_agent_ro` is not granted that table and should not be — mode 6
+learns that a campaign produced eleven leads by counting, not by reading eleven phone
+numbers. Nothing in this repo ever sees lead PII; `snap-leads` only ever registers a
+destination.
+
+**Under-18 submissions never become a lead row.** The receiver checks the declared
+birthday before storing anything and writes a `marketing_apply_gate` suppression row
+carrying an opaque id and nothing else. Storing-then-suppressing would mean a minor's
+phone number existed in the database, which is the thing the rule is about.
 
 ## "This proposal needs correcting before I run it"
 

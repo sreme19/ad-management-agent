@@ -128,8 +128,11 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 | command | what it does |
 |---|---|
 | `propose` | Record a mode-5 recommendation before you execute it |
+| `snap-leads` | Register/inspect where Snap delivers lead-form submissions (webhook, per form) |
 | `snap-push` | Create a proposed recommendation in Snap Ads Manager, PAUSED, then diff it back |
 | `meta-push` | Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back |
+| `snap-push-lead` | Create a proposed LEAD recommendation (video + on-platform form) on Snap, PAUSED, then diff it back |
+| `meta-push-lead` | Create a proposed LEAD recommendation (video + instant form) in Meta, PAUSED, then diff it back |
 | `amend` | Revise a still-proposed recommendation, with an audit trail of what changed |
 | `log-setup` | Record the real IDs after setting the ad up by hand |
 | `note` | Append a dated note to a record — for things that change mid-run |
@@ -156,6 +159,12 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 ad-agent propose [-h] --network NETWORK --campaign-name CAMPAIGN_NAME --ad-set-name AD_SET_NAME --ad-name AD_NAME --targeting-summary TARGETING_SUMMARY --creative-ref CREATIVE_REF --destination-url DESTINATION_URL [--budget-cap BUDGET_CAP] --duration-days DURATION_DAYS --brief BRIEF [--from-idea FROM_IDEA] --gender {FEMALE,MALE} --min-age MIN_AGE --max-age MAX_AGE --countries COUNTRIES [--os {ANDROID,IOS}] [--expansion {on,off}] slug
 ```
 
+#### `snap-leads`
+
+```
+ad-agent snap-leads [-h] [--form-id FORM_ID] [--url URL] [--integration-id INTEGRATION_ID] {forms,list,register,test,delete}
+```
+
 #### `snap-push`
 
 ```
@@ -166,6 +175,18 @@ ad-agent snap-push [-h] [--headline HEADLINE] [--dry-run] [--accept-campaign-cap
 
 ```
 ad-agent meta-push [-h] [--headline HEADLINE] [--message MESSAGE] [--cta CTA] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
+#### `snap-push-lead`
+
+```
+ad-agent snap-push-lead [-h] --video VIDEO [--headline HEADLINE] [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
+#### `meta-push-lead`
+
+```
+ad-agent meta-push-lead [-h] --video VIDEO --message MESSAGE [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
 #### `amend`
