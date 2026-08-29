@@ -336,3 +336,7 @@ Owner override recorded 2026-08-29 in creatives/moveon-lead-w1830/qa.md: the ind
 - Campaign ID: 1326aa05-902c-4cec-be92-0a7440ac536d
 - Ad set ID: 85c2e782-ea07-4216-8986-f272bdb5d4d7
 - Ad ID: 3c9d2884-b6e3-4137-98ed-2bfcb5f236d4
+
+## Note — observation (2026-08-29)
+
+CTA corrected 2026-08-29 at the app owner's request: the creative shipped with call_to_action SIGN_UP and was updated in place to APPLY_NOW via PUT, read back and confirmed persisted, ad still PAUSED. snap.py's create_lead_creative default changed to APPLY_NOW so the next push matches the Meta path's Apply framing without a correction.

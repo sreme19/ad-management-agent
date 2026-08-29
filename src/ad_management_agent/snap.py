@@ -468,7 +468,7 @@ class SnapClient:
             "ad_account_id": self.cfg["ad_account_id"],
             "name": name, "type": "LEAD_GENERATION",
             "headline": headline, "brand_name": brand_name,
-            "call_to_action": "SIGN_UP", "shareable": True,
+            "call_to_action": "APPLY_NOW", "shareable": True,
             "top_snap_media_id": media_id,
             "lead_generation_form_id": form_id,
             "profile_properties": {"profile_id": profile_id},
