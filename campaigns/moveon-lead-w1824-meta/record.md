@@ -1,13 +1,13 @@
 ---
 rec_id: rec-2026-08-29-moveon-lead-w1824-meta
 network: meta
-status: proposed
+status: live
 campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
 ad_set_name: WOMEN_18-24_CASUAL_MOVEON-LEAD
 ad_name: VID_MOVE-ON-PROPER_A_20260829
-campaign_id: null
-ad_set_id: null
-ad_id: null
+campaign_id: '6984366120881'
+ad_set_id: '6984366122081'
+ad_id: '6984368352481'
 targeting_summary: "Women 18-24, pan-India, Android only, Advantage Audience OFF.\
   \ First Meta lead campaign: OUTCOME_LEADS, instant form (first name/phone/email)\
   \ with thank-you screen sending her to /get/w-apply carrying ra_lead={{lead_id}}.\
@@ -37,6 +37,7 @@ last_note: '2026-08-29'
 campaign_daily_cap_inr: null
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-29'
+executed: '2026-08-29'
 ---
 
 ## Brief (proposed)
@@ -332,3 +333,14 @@ Asset finished by the app owner 2026-08-29: Gabarito type, licensed/Sound Collec
 ## Note — observation (2026-08-29)
 
 Independent section-8 pass returned FAIL (men in party-scene background; AI craft glitches incl. whited-out eyes, split-frame, warped fingers, watermark remnant, 720p) with two escalates (library student-read vs 6.3; closing walk-to-camera tableau vs creative-generation 1). App owner overrode in session 2026-08-29 and directed the push; override recorded in creatives/moveon-lead-w1830/qa.md alongside the untouched verdict, d68ccb2-style. Meta review risk and the 30 percent male-mix kill number stand.
+
+## Execution
+
+- Date: 2026-08-29
+- Campaign ID: 6984366120881
+- Ad set ID: 6984366122081
+- Ad ID: 6984368352481
+
+## Note — observation (2026-08-29)
+
+Pushed PAUSED via meta-push-lead 2026-08-29 after the Page permission fix (Riteangle page upgraded from Partial/Ads-and-Insights to Full for riteangle-api; a Meta account-verification step was completed by the app owner first). Tracked form 1979788699404507; video 1719740729289211; every read-back check ok except one KNOWN OPEN ITEM: Meta stores the thank-you URL's ra_lead braces percent-encoded (%7B%7Blead_id%7D%7D). Whether macro substitution fires on the encoded form is undetermined — the mandatory end-to-end test submission decides it. If the page receives literal braces, attribution falls back to ad-set level (utm_term). DO NOT ENABLE before that test. Asset pushed is the 720p v3 rough per the owner's section-8 override; swap the creative before enabling if a finished 1080 render lands.

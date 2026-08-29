@@ -1,13 +1,13 @@
 ---
 rec_id: rec-2026-08-29-moveon-lead-w2530-meta
 network: meta
-status: proposed
+status: live
 campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
 ad_set_name: WOMEN_25-30_CASUAL_MOVEON-LEAD
 ad_name: VID_MOVE-ON-PROPER_A_20260829
-campaign_id: null
-ad_set_id: null
-ad_id: null
+campaign_id: '6984366120881'
+ad_set_id: '6984368402281'
+ad_id: '6984368441881'
 targeting_summary: "Women 25-30, pan-India, Android only, Advantage Audience OFF.\
   \ Second band of the same campaign as rec-2026-08-29-moveon-lead-w1824-meta \u2014\
   \ same objective (OUTCOME_LEADS), same instant form, same thank-you handoff to /get/w-apply\
@@ -31,6 +31,10 @@ duration_days: 5
 from_idea: null
 created: '2026-08-29'
 last_note: '2026-08-29'
+campaign_daily_cap_inr: null
+campaign_lifetime_cap_inr: null
+campaign_caps_verified: '2026-08-29'
+executed: '2026-08-29'
 ---
 
 ## Brief (proposed)
@@ -326,3 +330,14 @@ Same two gates closed as rec-2026-08-29-moveon-lead-w1824-meta, same date, same 
 ## Note — observation (2026-08-29)
 
 Same section-8 FAIL and owner override as rec-2026-08-29-moveon-lead-w1824-meta — one asset serves both ad sets; see that record and creatives/moveon-lead-w1830/qa.md.
+
+## Execution
+
+- Date: 2026-08-29
+- Campaign ID: 6984366120881
+- Ad set ID: 6984368402281
+- Ad ID: 6984368441881
+
+## Note — observation (2026-08-29)
+
+Pushed PAUSED 2026-08-29, same run as rec-2026-08-29-moveon-lead-w1824-meta: tracked form 1048266097796124, same video asset, same read-back result, same open ra_lead percent-encoding question, same do-not-enable-before-the-end-to-end-test condition.
