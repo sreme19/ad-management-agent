@@ -10,8 +10,8 @@ Every line costs a round if skipped (`tools.md` § *Working with Google Flow*).
 
 1. **Image aspect ratio.** Sliders icon beside the prompt box → *Agent settings* →
    **Image generation default**. It ships **9:16**, which is a phone-video shape,
-   not a landing-page shape. Set it to **3:4** for slots 1–2 and 4–6, and switch
-   to **16:9** for slot 3 only.
+   not a landing-page shape. Set it to **3:4** for every slot in this pack — slot 3
+   was a 16:9 band and is now vertical too (see its note).
 2. **Model tier.** The prompt-box model selector *and* the Agent-settings dropdown
    both default to **Omni 1.1 Flash**, the weakest tier — round 04 scored craft
    2.5/5 on it. Use the highest still tier offered (**Veo 3.1 Quality** where the
@@ -155,36 +155,71 @@ who could read as a teenager; posing in a row for a group photo; anyone looking
 into the lens; a dark background; a bar or nightclub; alcohol; black and white.
 ```
 
-## SLOT 3 — `group-wide`. A section band, not a hero. **16:9**
+## SLOT 3 — `group-wide`. REWRITTEN 2026-08-28. **3:4**
 
-Switch the image default to 16:9 for this one plate, then switch it back.
+**Why it was rewritten.** The original was a 16:9 band. Sree then brought in a
+Grok plate — three women abreast, mid-stride, low sun, long shadows down a
+pavement — and it is a better statement of this slot's shape than the prompt
+text was. It shipped as `together.jpg` on his override of two hard gates (not
+India; §1's object-of-the-frame). This rewrite keeps the composition he liked and
+removes both failures, so the replacement stands on its own rather than on an
+override.
+
+**The one change that takes §1 off the table:** in the Grok plate nobody is
+talking to anybody. Three styled women advance on the lens in a line, every gaze
+past the camera — that is a lookbook, and a lookbook frame on a women's surface
+is the exact thing §1 traces the 98/2 split to. Give them a reason to be walking
+together and the same composition becomes a documentary frame. Everything else —
+abreast, mid-stride, golden hour, long shadows — is kept.
+
+Wardrobe also moves off the midriff: §4's negative list names cropped bodies
+outright, and there is no reason to spend the argument twice.
 
 ```
-A candid documentary photograph of four Indian women in their twenties walking
-together along an ordinary Bangalore street in warm late-afternoon light, shot
-horizontally. @Meher, @Ira and @Nandita are three of them, and the fourth is
-another woman in her twenties with long straight hair and a mustard shirt. They
-are mid-stride and spread across the frame at different distances, talking across
-each other, one half-turned back to say something. Everyone is in motion.
+A candid documentary photograph of three Indian women in their twenties —
+@Meher, @Ira and @Nandita — walking three abreast along a tree-lined residential
+footpath in Indiranagar, Bangalore, in the last hour of afternoon sun. All three
+are adults in their twenties. They are mid-stride and in step, and they are
+mid-conversation: @Ira has turned her head to say something to @Meher, @Meher is
+laughing at it, @Nandita is looking ahead and grinning at what she is hearing.
+They are talking to each other, not to the camera.
 
-Light: golden warm daylight, high-key, airy, cream and sand walls behind them
-softly out of focus.
+Light: low warm golden sun coming from behind the camera and slightly to the
+left, throwing three long soft shadows forward across the pavement. High-key and
+airy. Cream and sand-coloured compound walls and a gulmohar tree behind them,
+softly out of focus. The frame reads warm cream, never grey and never dark.
 
-Wardrobe: contemporary Indian urban streetwear, coral and warm pink and mustard
-against cream.
+Setting: unmistakably an Indian residential street — plastered compound walls, a
+painted gate, a parked scooter far behind them, dappled leaf shadow on the wall.
 
-Camera: 35mm, EYE LEVEL, travelling with them from slightly ahead and to one
-side. Slight motion blur in the hands and hair. Full figures. Documentary, no
-retouching.
+Wardrobe: contemporary Indian urban streetwear, unbranded, full-length tops —
+@Meher in a dusty coral tee, @Ira in a warm pink sleeveless printed top,
+@Nandita in a burnt coral kurta. Wide-leg trousers and jeans. Canvas totes. They
+carry the only saturated colour in a cream frame.
 
-Composition: the four of them occupy the left and centre of a wide horizontal
-frame, with open warm cream space on the right where text will sit. Keep the
-bottom eight percent clear of important detail. Horizontal 16:9.
+Camera: 35mm, shot from EYE LEVEL, straight on, from about four metres ahead of
+them. Full figures head to feet, nothing cropped. Slight motion blur in the hands
+and hair. Natural skin texture with visible pores, no beauty retouching, no
+glossy finish. Photojournalistic.
 
-EXCLUDE: any text, watermark, logo or legible signage; any man; a crowd; traffic
-chaos; anyone who could read as a teenager; anyone looking into the lens; a dark
-background; black and white.
+Composition: the three of them fill the middle of the frame and occupy most of
+its height, walking toward the viewer with the pavement and their shadows leading
+in from the bottom. Keep the bottom eight percent of the frame free of important
+detail so the tool's stamp can be cropped away. Vertical 3:4.
+
+EXCLUDE: any text, watermark, logo or legible signage; any man; a fourth person;
+anyone who could read as a teenager; posing in a row for a group photo; anyone
+looking into the lens; cropped tops or bare midriffs; a dark background; a bar or
+nightclub; alcohol; luxury or designer signifiers; black and white; low camera
+angles.
 ```
+
+**Variant B, only if A comes back stiff.** Keep every line above and swap the
+conversation beat for shared attention: *"All three are looking at something
+happening further down the street and reacting to it together — @Ira pointing,
+@Meher already laughing."* Still a reason, still not the lens. Do not fall back to
+all three staring past the camera; that is the plate this rewrite exists to
+replace.
 
 ## SLOT 4 — `moment-street`. Upgrades the current `moment.jpg`. **3:4**
 
