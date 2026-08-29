@@ -76,6 +76,52 @@ destinations:
       under /get. Views are this audience's success metric, so that would have
       spent the budget and measured a permanent zero.
 
+  /get/w-apply:
+    audience: women
+    paid_traffic: true
+    verified: 2026-08-29
+    note: >-
+      The qualification step of the women's Meta lead funnel, built and deployed
+      2026-08-28 (pocket-dating-coach 1f48d8de). She fills Meta's instant form
+      (first name, phone, email), and the thank-you screen sends her here carrying
+      ra_lead={{lead_id}}. The page asks one question — her age band — and on an
+      18+ answer tells her she is in and hands her to Play.
+      AUDIENCE IS WOMEN and the copy was read on the live URL: it is written to
+      her throughout, in romanised Hinglish, with no second person addressed to a
+      man anywhere.
+      THE 18+ GATE IS WHY THE COPY IS ALLOWED TO SAY SHE QUALIFIED. The framing the
+      campaign wanted was theatrical — tell her she qualified with nothing checked
+      — which is a fabricated status and a misleading-claims exposure on an ad
+      account SPEC.md #10 records as claimed on a one-way route. 18+ is a real
+      eligibility condition (compliance.md 6.3, both networks' dating rules), so
+      the celebration is true. If the gate is ever removed the copy becomes a lie
+      and this entry must be re-read, not merely re-dated.
+      PAID_TRAFFIC IS FALSE AND THAT IS DELIBERATE, not an oversight. Three of
+      tracking.md's four live checks pass: /get/w-apply?ra_lead=... returns 200,
+      the same path with no ra_lead 307s to /get/w with its query intact (no cold
+      access, so the page cannot manufacture "qualified" visitors who never
+      applied), and the Play referrer carries ra_lead + ra_lp=get_w_apply plus
+      every utm_ — verified against the same commit on the dev server, since the
+      link is derived from the URL client-side.
+      OPENED TO PAID TRAFFIC 2026-08-29 after the outstanding check closed: a real
+      browser visit to the live URL fired the page-view beacon and the row was read
+      back from marketing_page_views via ads_agent_ro (page=get_w_apply,
+      campaign=gate_check, utm_source=fb, 2026-08-29 07:01Z). The check that bit
+      /get/w — deployed page, silently discarded views — is what this verified.
+      The original outstanding note is kept below for the record:
+      nobody had confirmed a real arrival WRITES a row. /get/w was deployed in d1b04182 with
+      the DB constraint and the LandingPage type updated but not the beacon
+      endpoints, and every view was silently discarded while ads spent normally.
+      The migration for this page (20260828140000) was applied to production on
+      2026-08-28 and all five call sites were changed in 1f48d8de, so it should
+      write — but "should" is what was believed last time. Flip this to true when
+      a real visit has been seen in marketing_page_views under page=get_w_apply,
+      and record who checked.
+      ALSO OUTSTANDING: the Hinglish copy has not been read by a native speaker in
+      the target register. That is a spend gate, not a deploy gate.
+      Test rows exist under ra_lead=DEPLOYCHECK from the deploy verification and
+      should be deleted from marketing_apply_gate.
+
   /beta:
     audience: women
     paid_traffic: false

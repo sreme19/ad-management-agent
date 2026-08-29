@@ -18,12 +18,26 @@ Example: `RA_TRAFFIC_GET_IN_BLR_TOF_202608`
 | Part | Meaning | Example |
 |---|---|---|
 | `RA` | RiteAngle (brand short code) | `RA` |
-| `TRAFFIC` | Campaign objective (traffic to website) | `TRAFFIC` |
+| `TRAFFIC` | Campaign objective — see the objective tokens below | `TRAFFIC`, `LEADS` |
 | `[DEST]` | Destination / landing page — see the token table below | `GET`, `GETW` |
 | `IN` | Country (India) | `IN` |
 | `[GEO]` | City/region | `BLR`, `DEL`, `HYD`, or `PAN` (pan-India) |
 | `[FUNNEL]` | Funnel stage | `TOF` (top of funnel), `MOF`, `BOF` |
 | `[YYYYMM]` | Launch month | `202608` |
+
+### `[OBJECTIVE]` tokens
+
+Position 2 was written as the literal `TRAFFIC` when every campaign was a traffic campaign. It is
+the campaign's objective and it varies:
+
+| Token | Network objective | Added |
+|---|---|---|
+| `TRAFFIC` | Snap `TRAFFIC` / Meta `OUTCOME_TRAFFIC` | in production since 2026-08 |
+| `LEADS` | Meta `OUTCOME_LEADS` (on-platform instant form) | 2026-08-28 |
+
+`LEADS` was added for the women's apply funnel, whose capture point is an instant form inside Meta
+rather than a page on our own site. A leads campaign named `RA_TRAFFIC_...` would misdescribe what it
+optimises for in the one field a human reads first.
 
 ### `[DEST]` tokens
 
@@ -35,6 +49,11 @@ yet; add the row when the destination opens to paid traffic.
 |---|---|---|---|
 | `/get` | `GET` | men | in production since 2026-08 |
 | `/get/w` | `GETW` | women | 2026-08-27 |
+| `/get/w-apply` | `GETW-APPLY` | women | 2026-08-28 |
+
+A hyphen inside a token is fine and a `_` is not — the name is parsed positionally on underscores, so
+`GETW_APPLY` would shift `IN`, `[GEO]`, `[FUNNEL]` and the month one place right. Hyphens already
+appear in live ad-set signals (`MOVEON-LPV`, `IND-LPV`) for the same reason.
 
 `/beta` gets no token: `paid_traffic: false`, so no campaign can point at it.
 

@@ -1,0 +1,181 @@
+<title>Apply Funnel</title>
+<style>
+  :root{
+    --bg:#faf7f2; --panel:#fff; --ink:#1a1714; --muted:#6b615a; --line:#e3dbd1;
+    --coral:#d9614a; --coral-soft:#f7e4df; --green:#2f7d5d; --green-soft:#e0f0e8;
+    --amber:#9a6b13; --amber-soft:#f8ecd4; --red:#9c2f2f; --red-soft:#f6e0e0;
+    --meta:#3b5da8; --meta-soft:#e3e9f6;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#16130f; --panel:#211d18; --ink:#f2ece4; --muted:#a89c90; --line:#39322a;
+      --coral:#f08a70; --coral-soft:#3d2620; --green:#6bc79b; --green-soft:#17301f;
+      --amber:#e0ad55; --amber-soft:#332714; --red:#e58b8b; --red-soft:#331a1a;
+      --meta:#8fa9e0; --meta-soft:#1c2438;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#16130f; --panel:#211d18; --ink:#f2ece4; --muted:#a89c90; --line:#39322a;
+    --coral:#f08a70; --coral-soft:#3d2620; --green:#6bc79b; --green-soft:#17301f;
+    --amber:#e0ad55; --amber-soft:#332714; --red:#e58b8b; --red-soft:#331a1a;
+    --meta:#8fa9e0; --meta-soft:#1c2438;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);margin:0;padding:40px 24px 80px;
+    font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin:0 0 34px;font-size:14px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+    margin:44px 0 16px;font-weight:600}
+  .flow{display:flex;flex-direction:column;gap:0;align-items:stretch}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:start}
+  .n{width:26px;height:26px;border-radius:50%;background:var(--coral-soft);color:var(--coral);
+    display:grid;place-items:center;font-weight:700;font-size:13px}
+  .step h3{margin:0 0 3px;font-size:15px;font-weight:650}
+  .step p{margin:0;color:var(--muted);font-size:13.5px}
+  .where{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+    background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px 9px;white-space:nowrap}
+  .where.meta{color:var(--meta);background:var(--meta-soft);border-color:transparent}
+  .arrow{height:22px;display:grid;place-items:center;color:var(--line);font-size:15px}
+  .tag{display:inline-block;font-size:11.5px;font-weight:650;border-radius:5px;padding:2px 7px;margin-top:7px}
+  .real{background:var(--green-soft);color:var(--green)}
+  .gate{background:var(--amber-soft);color:var(--amber)}
+  code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+    background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}}
+  .phone{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px 20px;
+    min-height:330px;display:flex;flex-direction:column}
+  .phone .cap{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin-bottom:16px;font-weight:600}
+  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:8px}
+  .bar i{display:block;height:100%;background:var(--coral);border-radius:99px}
+  .stepnum{font-size:12px;color:var(--muted);margin-bottom:22px}
+  .q{font-size:21px;font-weight:680;letter-spacing:-.015em;margin:0 0 18px;line-height:1.25}
+  .q small{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-bottom:5px}
+  .bands{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .band{border:1.5px solid var(--line);border-radius:9px;padding:13px 0;text-align:center;
+    font-weight:640;font-size:15px}
+  .u18{margin-top:16px;font-size:12.5px;color:var(--muted);text-decoration:underline;text-align:center}
+  .tick{width:40px;height:40px;border-radius:50%;background:var(--green-soft);color:var(--green);
+    display:grid;place-items:center;font-size:21px;margin-bottom:14px}
+  .cta{margin-top:auto;background:var(--coral);color:#fff;border-radius:10px;padding:14px;
+    text-align:center;font-weight:680;font-size:15px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:12px}
+  .chain{display:flex;flex-wrap:wrap;gap:7px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:16px}
+  .link{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:12.5px}
+  .link b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+  .sep{color:var(--muted)}
+  ul.gates{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+  ul.gates li{background:var(--red-soft);border-left:3px solid var(--red);border-radius:0 8px 8px 0;
+    padding:11px 14px;font-size:13.5px}
+  ul.gates li b{color:var(--red)}
+  .scroll{overflow-x:auto}
+</style>
+<div class="wrap">
+<h1>The apply funnel — women 18–30, Meta</h1>
+<p class="sub">MOVE-ON lead campaign · draft 2026-08-28 · <code>/get/w-apply</code> · nothing pushed</p>
+
+<h2>Flow</h2>
+<div class="flow">
+  <div class="step"><div class="n">1</div><div>
+    <h3>Breakup-hook ad</h3>
+    <p>Google Flow creative, 4:5 or 1080×1920. Her POV, not her as the object of the frame. CTA reads <b>Apply</b>.</p>
+    <p class="note">Women · 18–24 and 25–30 · Bangalore · <b>Android only</b> · expansion OFF</p>
+  </div><span class="where meta">Meta</span></div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step"><div class="n">2</div><div>
+    <h3>Instant form</h3>
+    <p>First name · phone · email. Autofilled by Meta — this is the whole friction argument.</p>
+    <span class="tag real">Real capture → lead_id</span>
+  </div><span class="where meta">Meta</span></div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step"><div class="n">3</div><div>
+    <h3>Thank-you screen — “One step left”</h3>
+    <p>CTA carries literal UTMs plus <code>ra_lead={{lead_id}}</code>, the only macro in the URL.</p>
+    <span class="tag real">True — she isn’t done</span>
+  </div><span class="where meta">Meta</span></div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step"><div class="n">4</div><div>
+    <h3><code>/get/w-apply</code> — the age gate</h3>
+    <p>One question, full screen. Progress bar already two-thirds full, because she really did the work on Meta.</p>
+    <span class="tag gate">Real gate — 18+ is genuine eligibility</span>
+  </div><span class="where">Site</span></div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step"><div class="n">5</div><div>
+    <h3>“You’re in.”</h3>
+    <p>She passed a real criterion, so the claim is true — no fabricated status, no override to record.</p>
+    <span class="tag real">True</span>
+  </div><span class="where">Site</span></div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step"><div class="n">6</div><div>
+    <h3>Play Store</h3>
+    <p>Referrer carries <code>ra_lp</code> + <code>ra_lead</code> + every <code>utm_*</code>, so the install joins back to the lead.</p>
+  </div><span class="where">Play</span></div>
+</div>
+
+<h2>The page, both states</h2>
+<div class="cols">
+  <div class="phone">
+    <div class="cap">State 1 — the gate</div>
+    <div class="bar"><i style="width:66%"></i></div>
+    <div class="stepnum">Step 2 of 3</div>
+    <p class="q"><small>Almost there, Priya.</small>How old are you?</p>
+    <div class="bands">
+      <div class="band">18–20</div><div class="band">21–24</div>
+      <div class="band">25–30</div><div class="band">31+</div>
+    </div>
+    <div class="u18">I’m under 18</div>
+    <p class="note">Bands, not an 18+ checkbox — it reads as a real question, and it tells us whether
+      Meta actually delivered the band we paid for.</p>
+  </div>
+
+  <div class="phone">
+    <div class="cap">State 2 — the reveal</div>
+    <div class="bar"><i style="width:100%"></i></div>
+    <div class="stepnum">Step 3 of 3</div>
+    <div class="tick">✓</div>
+    <p class="q">You’re in, and you’re early.</p>
+    <p class="note" style="margin-top:-8px">Riteangle verifies every man before he reaches you.<br>
+      Your invite is on this device.</p>
+    <div class="cta">Get the app</div>
+    <p class="note">Understated on purpose — hype trips compliance §7, and “verifies every man” is the
+      approved claim under §4.</p>
+  </div>
+</div>
+
+<h2>Attribution chain — one key, end to end</h2>
+<div class="scroll"><div class="chain">
+  <div class="link"><b>Meta</b>lead_id</div><span class="sep">→</span>
+  <div class="link"><b>thank-you URL</b>ra_lead=…</div><span class="sep">→</span>
+  <div class="link"><b>site view</b>marketing_page_views</div><span class="sep">→</span>
+  <div class="link"><b>Play referrer</b>ra_lp + ra_lead</div><span class="sep">→</span>
+  <div class="link"><b>install</b>user_acquisition</div>
+</div></div>
+<p class="note">Token, not email — SPEC #7 bars this agent from user tables, and <code>lead_id</code>
+carries no PII. Holds only if she taps through in the same session, so it is a floor on attribution,
+not a complete picture.</p>
+
+<h2>Four conditions, or the gate is fake again</h2>
+<ul class="gates">
+  <li><b>Under 18 must stop, and the lead must be deleted.</b> Her details were captured before the
+    gate; under DPDP a child’s data needs verifiable parental consent. Required in v1.</li>
+  <li><b>No cold access.</b> No <code>ra_lead</code> means she never filled the form and “one step
+    left” is nonsense. Fall back to a normal page.</li>
+  <li><b>Don’t fake the processing beat.</b> Label it for what it is — we really are saving her lead.</li>
+  <li><b>iPhone fallback.</b> Android-only targeting leaks. A dead install button is worse than a waitlist.</li>
+</ul>
+</div>
