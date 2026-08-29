@@ -554,6 +554,27 @@ learns that a campaign produced eleven leads by counting, not by reading eleven 
 numbers. Nothing in this repo ever sees lead PII; `snap-leads` only ever registers a
 destination.
 
+**What the wiring actually looks like, verified 2026-08-29.** All seven lead forms
+on the account now point at the receiver. Facts that cost real failures to find, all
+recorded in `lrn-2026-08-29-snap-lead-webhook-only`:
+
+- The create body must be wrapped in a `webhook_integrations` list. Unwrapped, Snap
+  answers `500 INTERNAL_FAILURE`, which says nothing about why.
+- **One object, three response shapes.** Create returns snake_case
+  (`webhook_integrations` / `integration_id`), the docs example shows camelCase, and
+  the list endpoint returns `partner_integrations` with the url nested under
+  `generic_webhook_handler_info`. Reading the wrong key returns an empty list and no
+  error — which is how `snap-leads forms` first reported all seven forms as having no
+  webhook. Same failure shape as `lrn-2026-08-28-channel2-rls-blocks-every-read`: a
+  channel that returns nothing and looks like an honest zero.
+- **Snap signs `{timestamp}.{body}`, not the body.** The timestamp arrives in a `t`
+  header and the signature in a header named `signature`. Signing the body alone
+  produces a well-formed hex string that never matches, and the 401 looks exactly like
+  a wrong secret.
+- The receiver enforces **no freshness window** on that timestamp, deliberately. Snap
+  retries what it did not get a 2xx for, and rejecting a late retry loses the lead;
+  replay is already inert because `snap_lead_id` is unique-indexed.
+
 **Under-18 submissions never become a lead row.** The receiver checks the declared
 birthday before storing anything and writes a `marketing_apply_gate` suppression row
 carrying an opaque id and nothing else. Storing-then-suppressing would mean a minor's
