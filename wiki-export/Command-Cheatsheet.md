@@ -443,6 +443,23 @@ after the real ad id exists, so there is no `{{ad.id}}` macro left to silently f
 When it finishes it prints the `log-setup` command with the real ids filled in. Run that once you've
 enabled the ad &mdash; the loop is not closed until you do.
 
+## "Create the LEAD version on Snap for me" (video + on-platform form)
+
+```bash
+ad-agent snap-push-lead rec-2026-08-29-moveon-lead-w1830-snap \
+  --video ~/renders/energy-kahan-jaati-hai-STITCH.mp4 --dry-run
+```
+
+The Snap sibling of `ad-agent meta-push-lead`, added the same day. LEAD_GENERATION
+campaign/creative/ad, LEAD_FORM_SUBMISSIONS ad squad (no pixel — the conversion happens
+inside Snap), and a lead form created via the API (first name / phone / email, privacy
+policy, an end page whose button carries her to the destination). One difference from
+Meta, accepted rather than gamed: Snap documents no macro and no update for the end-page
+URL, so it carries ad-squad-level UTM literals plus `ra_src=form` — the marker
+`/get/w-apply` admits without a per-lead id — and `utm_id` is absent because the ad
+cannot exist before the form. `--form-id` binds a hand-made form instead. Everything
+PAUSED, same transport guard, same read-back-and-diff.
+
 ## "Create the LEAD version on Meta for me" (video + instant form)
 
 ```bash

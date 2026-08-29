@@ -315,6 +315,172 @@ class SnapClient:
         }]})
         return self._one(res, "adsquads")
 
+    # ---- lead ads (LEAD_GENERATION / on-platform forms) --------------------
+    #
+    # Added 2026-08-29, immediately after the Meta lead path and at the same
+    # request. rules/funnel.md rung 3 priced this exactly: "new objective
+    # (snap.py hardcodes TRAFFIC), new ad type, a lead-form resource snap.py has
+    # no call for" — these are those three things. Same SPEC #3 shape throughout:
+    # PAUSED at creation, every request through the transport guard, nothing here
+    # enables or changes a live budget.
+    #
+    # One limit Meta does not have, recorded rather than papered over: Snap's
+    # lead form has an end-page URL and documents NO macro for it, so no per-lead
+    # id reaches /get/w-apply from Snap. The app owner's call (2026-08-29, in as
+    # many words): proceed without it — the page accepts ra_src=form arrivals and
+    # attribution falls back to the ad-squad-level UTMs the URL carries as
+    # literals. utm_id is absent for the same reason the Meta path needed a
+    # two-pass form: the ad does not exist when the form is made — but Snap
+    # documents no form update, so the fallback is accepted instead of gamed.
+
+    def create_lead_campaign(self, name: str, start_time: str) -> dict:
+        res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/campaigns", {"campaigns": [{
+            "name": name,
+            "ad_account_id": self.cfg["ad_account_id"],
+            "status": "PAUSED",
+            "start_time": start_time,
+            "buy_model": "AUCTION",
+            "objective_v2_properties": {"objective_v2_type": "LEAD_GENERATION"},
+        }]})
+        return self._one(res, "campaigns")
+
+    def find_adsquad(self, name: str, campaign_id: str) -> dict | None:
+        """Exact-name lookup under one campaign, so a retry resumes instead of duplicating.
+
+        Mirrors meta.py's find_adset, for the same reason: a push with no rollback
+        and several objects to create dies partway as a normal state, and the retry
+        must reuse what exists rather than mint a duplicate ad squad at another
+        Rs 300/day under the same parent.
+        """
+        res = self.get(f"/campaigns/{campaign_id}/adsquads")
+        rows = [r.get("adsquad") or r for r in res.get("adsquads", [])]
+        hits = [a for a in rows if a.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h.get("id", "?") for h in hits)
+            raise SnapError(
+                f"{len(hits)} ad squads under campaign {campaign_id} are named {name!r} "
+                f"({ids}). Refusing to guess — rename or delete the duplicate first."
+            )
+        return hits[0] if hits else None
+
+    def find_ad(self, name: str, ad_squad_id: str) -> dict | None:
+        """Exact-name lookup under one ad squad; the sibling of find_adsquad."""
+        res = self.get(f"/adsquads/{ad_squad_id}/ads")
+        rows = [r.get("ad") or r for r in res.get("ads", [])]
+        hits = [a for a in rows if a.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h.get("id", "?") for h in hits)
+            raise SnapError(
+                f"{len(hits)} ads under ad squad {ad_squad_id} are named {name!r} "
+                f"({ids}). Refusing to guess — rename or delete the duplicate first."
+            )
+        return hits[0] if hits else None
+
+    def find_lead_form(self, name: str) -> dict | None:
+        """Exact-name lookup, so a retry resumes instead of duplicating a form."""
+        res = self.get(f"/adaccounts/{self.cfg['ad_account_id']}/lead_generation_forms")
+        rows = [r.get("lead_generation_form") or r for r in
+                res.get("lead_generation_forms", [])]
+        hits = [f for f in rows if f.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h.get("id", "?") for h in hits)
+            raise SnapError(
+                f"{len(hits)} lead forms are named {name!r} ({ids}). Refusing to "
+                "guess — archive the duplicates in Ads Manager first."
+            )
+        return hits[0] if hits else None
+
+    def create_lead_form(self, *, name: str, privacy_url: str,
+                         end_page_url: str) -> dict:
+        """Create the instant form: first name, phone, email, and the handoff.
+
+        The end page is the funnel hinge — its button carries her to /get/w-apply
+        with the UTMs as literals plus ra_src=form (the marker that lets the page
+        admit her without a lead id). Everything in that URL is known at creation
+        time except the ad id, which cannot be: the form precedes the ad and Snap
+        documents no way to change the URL after. Ad-squad-level attribution is
+        the accepted cost, on the record in the module comment above.
+        """
+        res = self.post(
+            f"/adaccounts/{self.cfg['ad_account_id']}/lead_generation_forms",
+            {"lead_generation_forms": [{
+                "ad_account_id": self.cfg["ad_account_id"],
+                "name": name,
+                "title": "Bas ek step baaki hai",
+                "description": "Aapka apply almost complete hai.",
+                # FIRST_NAME + LAST_NAME, not FIRST_NAME alone: Snap refuses a
+                # lone first name (E25012, live rejection 2026-08-29), and the
+                # account's own UI-made forms all use this pair — observed
+                # convention over guessed alternative, the same rule that decided
+                # meta.py's pixel question.
+                "form_fields": [
+                    {"type": "FIRST_NAME"},
+                    {"type": "LAST_NAME"},
+                    {"type": "PHONE_NUMBER"},
+                    {"type": "EMAIL"},
+                ],
+                "privacy_policy_url": privacy_url,
+                # The docs show end_page_properties at the top level; the API
+                # refuses that with E25022. The shape below is what a live
+                # UI-made form on this account actually stores — an ARRAY inside
+                # default_end_page — read back on 2026-08-29 rather than guessed.
+                "default_end_page": {
+                    "headline": "Bas ek step baaki hai",
+                    "description": "Aapka apply almost complete hai.",
+                    "end_page_properties": [{
+                        "call_to_action": "VIEW_WEBSITE",
+                        "url": end_page_url,
+                    }],
+                },
+            }]})
+        return self._one(res, "lead_generation_forms")
+
+    def create_lead_adsquad(self, *, name, campaign_id, targeting, daily_budget_inr,
+                            start_time, end_time) -> dict:
+        """Create the ad squad for a lead campaign, PAUSED.
+
+        Differs from create_adsquad in what the objective forces: optimisation is
+        the form submission, and no pixel is required — the conversion happens
+        inside Snap, not on a page the pixel can see, so create_adsquad's hard
+        pixel requirement would demand a signal this goal cannot use.
+        """
+        res = self.post(f"/campaigns/{campaign_id}/adsquads", {"adsquads": [{
+            "name": name,
+            "campaign_id": campaign_id,
+            "type": "SNAP_ADS",
+            "status": "PAUSED",
+            "targeting": targeting,
+            "optimization_goal": "LEAD_FORM_SUBMISSIONS",
+            "billing_event": "IMPRESSION",
+            "bid_strategy": "AUTO_BID",
+            "daily_budget_micro": int(daily_budget_inr * MICRO),
+            "placement_v2": {"config": "AUTOMATIC"},
+            "start_time": start_time,
+            "end_time": end_time,
+        }]})
+        return self._one(res, "adsquads")
+
+    def create_lead_creative(self, *, name, media_id, headline, brand_name,
+                             form_id, profile_id) -> dict:
+        if len(headline) > 34:
+            raise SnapError(f"headline is {len(headline)} chars; Snap's limit is 34: {headline!r}")
+        res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/creatives", {"creatives": [{
+            "ad_account_id": self.cfg["ad_account_id"],
+            "name": name, "type": "LEAD_GENERATION",
+            "headline": headline, "brand_name": brand_name,
+            "call_to_action": "SIGN_UP", "shareable": True,
+            "top_snap_media_id": media_id,
+            "lead_generation_form_id": form_id,
+            "profile_properties": {"profile_id": profile_id},
+        }]})
+        return self._one(res, "creatives")
+
+    def create_lead_ad(self, *, name, ad_squad_id, creative_id) -> dict:
+        return self._one(self.post(f"/adsquads/{ad_squad_id}/ads", {"ads": [{
+            "ad_squad_id": ad_squad_id, "creative_id": creative_id,
+            "name": name, "type": "LEAD_GENERATION", "status": "PAUSED",
+        }]}), "ads")
+
     # ---- media + creative + ad -------------------------------------------
     def upload_media(self, name: str, path: Path, media_type: str = "IMAGE") -> dict:
         """Register and upload one media object.

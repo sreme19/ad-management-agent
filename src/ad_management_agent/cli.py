@@ -590,6 +590,186 @@ def _gate_campaign_budget_optimization(caps: dict, *, rec_id: str) -> None:
     raise SystemExit(2)
 
 
+def cmd_snap_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Create a proposed LEAD record on Snap, PAUSED, and diff it back.
+
+    The Snap sibling of cmd_meta_push_lead, added the same day at the same
+    request. Where Meta's push builds a provisional form and repoints the ad at a
+    tracked one, Snap's cannot: the form's end-page URL is fixed at creation and
+    Snap documents no update and no macro. So the URL carries ad-squad-level
+    literals plus ra_src=form — the marker /get/w-apply admits without a lead id
+    — and per-ad attribution is an accepted, recorded absence, not an oversight.
+    """
+    config = load_config()
+    rec = ledger.find(args.rec_id)
+    fm = rec.front_matter
+
+    if fm.get("network") != "snap":
+        print(f"error: {args.rec_id} is network={fm.get('network')!r}, not snap", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        networkreg.require_creation(ledger.root / "rules", "snap", mode="paused-only")
+    except networkreg.NetworkError as exc:
+        _fail(exc)
+    if fm.get("status") != "proposed":
+        print(f"error: {args.rec_id} is {fm.get('status')!r}; push expects 'proposed'.",
+              file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        destinations.check(ad_set_name=fm["ad_set_name"],
+                           destination_url=fm["destination_url"],
+                           rules_dir=ledger.root / "rules")
+    except destinations.DestinationGateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    video = Path(args.video).expanduser()
+    if not video.exists():
+        print(f"error: video not found at {video}", file=sys.stderr)
+        raise SystemExit(2)
+    qa = ledger.root / fm["creative_ref"] / "qa.md"
+    if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
+        print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+    start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
+    end = start + _dt.timedelta(days=int(fm["duration_days"]))
+    def iso(d):
+        return d.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    budget = float(fm["budget_cap_inr_per_day"])
+    spec = fm.get("targeting")
+    if not spec:
+        print(f"error: {args.rec_id} has no structured `targeting` block.", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        targetingspec.validate(spec)
+        targetingspec.check_matches_ad_set_name(spec, fm["ad_set_name"])
+    except targetingspec.TargetingError as exc:
+        _fail(exc)
+    targeting = targetingspec.to_snap(spec)
+
+    privacy_url = "https://www.riteangle.dating/privacy-policy"
+
+    plan = [
+        ("campaign   ", f'{fm["campaign_name"]}  LEAD_GENERATION'),
+        ("ad squad   ", (f'{fm["ad_set_name"]}  Rs {budget:.0f}/day x '
+                         f'{fm["duration_days"]}d, LEAD_FORM_SUBMISSIONS, auto bid')),
+        ("ad         ", fm["ad_name"]),
+        ("form       ", f'first name + phone + email, privacy={privacy_url}'),
+        ("end page   ", (f'{fm["destination_url"]}?<squad-level utms>&ra_src=form '
+                         '(no per-lead id — Snap documents no macro)')),
+        ("video      ", str(video)),
+        ("targeting  ", targetingspec.describe(spec)),
+    ]
+    print(f"Plan for {args.rec_id} (everything created PAUSED):")
+    for k, v in plan:
+        print(f"  {k}  {v}")
+
+    client = None
+    try:
+        client = snapapi.SnapClient(config.get("snap") or {})
+    except snapapi.SnapError as exc:
+        if not args.dry_run:
+            _fail(exc)
+        print(f"\nnote: no Snap credentials; parent caps NOT checked. ({exc})")
+
+    campaign = None
+    if client is not None:
+        campaign = client.find_campaign(fm["campaign_name"])
+        if campaign:
+            print(f"\ncampaign  reusing {campaign['id']}")
+        elif args.dry_run:
+            print(f"\ncampaign  {fm['campaign_name']} does not exist yet; would be created "
+                  "new, objective LEAD_GENERATION")
+        else:
+            campaign = client.create_lead_campaign(fm["campaign_name"], iso(start))
+            print(f"\ncampaign  created {campaign['id']}")
+
+    if campaign is not None:
+        caps = client.campaign_caps(campaign["id"])
+        _gate_campaign_caps(caps, squad_daily_inr=budget, duration_days=int(fm["duration_days"]),
+                            rec_id=args.rec_id, accept=args.accept_campaign_cap)
+        if not args.dry_run:
+            ledger.record_campaign_caps(args.rec_id, daily_inr=caps.get("daily_inr"),
+                                        lifetime_inr=caps.get("lifetime_inr"), today=_today())
+
+    if args.dry_run:
+        print("\n--dry-run: nothing created.")
+        return
+
+    squad = client.find_adsquad(fm["ad_set_name"], campaign["id"])
+    if squad:
+        print(f"ad squad  reusing {squad['id']} (already existed under this campaign)")
+    else:
+        squad = client.create_lead_adsquad(
+            name=fm["ad_set_name"], campaign_id=campaign["id"], targeting=targeting,
+            daily_budget_inr=budget, start_time=iso(start), end_time=iso(end))
+        print(f"ad squad  created {squad['id']}")
+
+    # The end-page URL: rules/tracking.md's params as literals at squad level
+    # (utm_id needs the ad id, which the form must precede), plus ra_src=form so
+    # /get/w-apply admits her without a lead id.
+    utms = _utm_query(ledger.root / "rules", "snap", fm["campaign_name"],
+                      squad["id"], "", fm["ad_name"])
+    utms = "&".join(q for q in utms.split("&") if not q.startswith("utm_id="))
+    end_page = f'{fm["destination_url"]}?{utms}&ra_src=form'
+
+    if args.form_id:
+        form = {"id": str(args.form_id)}
+        print(f"form      using existing {args.form_id} (its end-page URL is YOURS to verify)")
+    else:
+        form_name = f'RA_LEAD_{fm["ad_set_name"]}_SNAP'
+        form = client.find_lead_form(form_name) or client.create_lead_form(
+            name=form_name, privacy_url=privacy_url, end_page_url=end_page)
+        print(f"form      {form['id']}")
+
+    media = client.upload_media(f'{fm["ad_name"]}_MEDIA', video, media_type="VIDEO")
+    print(f"video     uploaded media_id={media['id']}")
+
+    creative = client.create_lead_creative(
+        name=f'{fm["ad_name"]}_CREATIVE', media_id=media["id"],
+        headline=args.headline, brand_name="riteangle",
+        form_id=form["id"], profile_id=(config.get("snap") or {}).get("profile_id"))
+    print(f"creative  created {creative['id']}")
+
+    ad = client.find_ad(fm["ad_name"], squad["id"])
+    if ad:
+        print(f"ad        reusing {ad['id']} (already existed under this ad squad)")
+    else:
+        ad = client.create_lead_ad(name=fm["ad_name"], ad_squad_id=squad["id"],
+                                   creative_id=creative["id"])
+        print(f"ad        created {ad['id']}")
+
+    print("\nRead-back:")
+    squad_live = client.get(f"/adsquads/{squad['id']}")["adsquads"][0]["adsquad"]
+    ad_live = client.get(f"/ads/{ad['id']}")["ads"][0]["ad"]
+    checks = [
+        ("ad squad status", squad_live.get("status"), "PAUSED"),
+        ("ad status", ad_live.get("status"), "PAUSED"),
+        ("ad type", ad_live.get("type"), "LEAD_GENERATION"),
+        ("daily budget (micro)", squad_live.get("daily_budget_micro"),
+         int(budget * snapapi.MICRO)),
+        ("optimisation goal", squad_live.get("optimization_goal"), "LEAD_FORM_SUBMISSIONS"),
+    ]
+    for label, got, want in checks:
+        ok = str(got) == str(want)
+        print(f"  {'ok ' if ok else 'DIFF'}  {label}: {got!r}" + ("" if ok else f" (wanted {want!r})"))
+    for label, got, want in targetingspec.snap_readback_checks(spec, squad_live):
+        ok = str(got) == str(want)
+        print(f"  {'ok ' if ok else 'DIFF'}  targeting {label}: {got!r}" + ("" if ok else f" (wanted {want!r})"))
+    print(f"  end page  {end_page}")
+
+    print(f"""
+Created PAUSED. Before enabling:
+  1. ad-agent log-setup {args.rec_id} --network snap --campaign-id {campaign['id']} --ad-set-id {squad['id']} --ad-id {ad['id']}
+  2. ONE end-to-end test in the Snapchat app preview: submit the form, tap the end-page
+     button, confirm /get/w-apply LOADS (does not bounce to /get/w) and the
+     marketing_apply_gate row lands with ra_lead null and the squad-level utm_term.
+  3. Delete the test lead afterwards. Enabling is a human click in Ads Manager.""")
+
+
 def cmd_meta_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
     """Create a proposed LEAD record on Meta, PAUSED, and diff it back.
 
@@ -1836,6 +2016,21 @@ def build_parser() -> argparse.ArgumentParser:
                          "stated deviation rather than a surprise. Does NOT apply to a "
                          "campaign-budget-optimisation parent, which is refused outright")
     sp.set_defaults(func=cmd_meta_push)
+
+    sp = sub.add_parser(
+        "snap-push-lead",
+        help="Create a proposed LEAD recommendation (video + on-platform form) on Snap, "
+             "PAUSED, then diff it back",
+    )
+    sp.add_argument("rec_id")
+    sp.add_argument("--video", required=True, help="path to the finished 9:16 video")
+    sp.add_argument("--headline", default="Apply karo — sirf 18+",
+                    help="Snap headline, hard limit 34 chars")
+    sp.add_argument("--form-id", default=None,
+                    help="bind an existing Snap lead form by id instead of creating one")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--accept-campaign-cap", action="store_true")
+    sp.set_defaults(func=cmd_snap_push_lead)
 
     sp = sub.add_parser(
         "meta-push-lead",

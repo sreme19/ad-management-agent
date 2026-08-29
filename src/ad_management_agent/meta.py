@@ -588,23 +588,29 @@ class MetaClient:
             )
         return token
 
-    def _call_as_page(self, method: str, path: str, payload: dict) -> dict:
+    def _call_as_page(self, method: str, path: str, payload: dict | None = None) -> dict:
         """One request authorised as the Page. Same guard, different bearer.
 
         Deliberately funnels through the same _safety_violations check as _call —
         a page-authorised request is still this module's outbound traffic, and the
         paused-only rule does not care which token carries a violation.
+
+        Handles GET too (payload None): the 2026-08-29 push failed live on exactly
+        this — READING /{page_id}/leadgen_forms needs the Page token as much as
+        posting to it does ("(#190) This method must be called with a Page Access
+        Token"), and find_lead_form had gone out with the account bearer.
         """
-        violations = _safety_violations(method, path, payload)
-        if violations:
-            raise MetaSafetyError(
-                f"REFUSED: {method} {path} would break the paused-only rule.\n"
-                + "\n".join(f"  - {v}" for v in violations)
-            )
+        if payload is not None:
+            violations = _safety_violations(method, path, payload)
+            if violations:
+                raise MetaSafetyError(
+                    f"REFUSED: {method} {path} would break the paused-only rule.\n"
+                    + "\n".join(f"  - {v}" for v in violations)
+                )
         data = urllib.parse.urlencode(
             {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
              for k, v in payload.items()}
-        ).encode()
+        ).encode() if payload is not None else None
         req = urllib.request.Request(
             f"{API}{path}", data=data, method=method.upper(),
             headers={"Authorization": f"Bearer {self.page_token()}"})
@@ -622,8 +628,9 @@ class MetaClient:
         Same reason find_adset exists: this push has no rollback, and a run that
         dies after the form is created must reuse it, not mint a sibling.
         """
-        res = self.get(f"/{self.cfg['page_id']}/leadgen_forms",
-                       fields="id,name,status,thank_you_page")
+        res = self._call_as_page(
+            "GET", f"/{self.cfg['page_id']}/leadgen_forms"
+                   "?fields=id,name,status,thank_you_page")
         hits = [f for f in res.get("data", []) if f.get("name") == name]
         if len(hits) > 1:
             ids = ", ".join(h["id"] for h in hits)

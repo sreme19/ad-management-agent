@@ -322,3 +322,7 @@ enabled. This should become a pre-launch gate in the rules, not a habit.
 ## Note — observation (2026-08-29)
 
 Same two gates closed as rec-2026-08-29-moveon-lead-w1824-meta, same date, same asset: finished 1080x1920 render with Gabarito and real music, watermark cropped; Hinglish native-speaker read done. See that record's note for detail — one asset serves both ad sets.
+
+## Note — observation (2026-08-29)
+
+Same section-8 FAIL and owner override as rec-2026-08-29-moveon-lead-w1824-meta — one asset serves both ad sets; see that record and creatives/moveon-lead-w1830/qa.md.

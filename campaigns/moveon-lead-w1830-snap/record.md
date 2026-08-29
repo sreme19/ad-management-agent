@@ -1,27 +1,27 @@
 ---
-rec_id: rec-2026-08-29-moveon-lead-w1824-meta
-network: meta
-status: proposed
+rec_id: rec-2026-08-29-moveon-lead-w1830-snap
+network: snap
+status: live
 campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
-ad_set_name: WOMEN_18-24_CASUAL_MOVEON-LEAD
+ad_set_name: WOMEN_18-30_CASUAL_MOVEON-LEAD
 ad_name: VID_MOVE-ON-PROPER_A_20260829
-campaign_id: null
-ad_set_id: null
-ad_id: null
-targeting_summary: "Women 18-24, pan-India, Android only, Advantage Audience OFF.\
-  \ First Meta lead campaign: OUTCOME_LEADS, instant form (first name/phone/email)\
-  \ with thank-you screen sending her to /get/w-apply carrying ra_lead={{lead_id}}.\
-  \ The 98/2 defence is structural: gender hard-set FEMALE plus expansion off removes\
-  \ the pool the submit-optimised algorithm drifts toward; kill number 30 percent\
-  \ male leads in week 1, set before launch. At Rs 300/day the ad set will not exit\
-  \ Meta's learning phase (lrn-2026-08-29-lead-ad-sets-cannot-exit-learning) \u2014\
-  \ accepted knowingly: this test answers 'do women submit at all', not 'which band\
-  \ is better'. Manual setup in Ads Manager (route a); meta.py has no lead-form path\
-  \ yet."
+campaign_id: 1326aa05-902c-4cec-be92-0a7440ac536d
+ad_set_id: 85c2e782-ea07-4216-8986-f272bdb5d4d7
+ad_id: 3c9d2884-b6e3-4137-98ed-2bfcb5f236d4
+targeting_summary: "Women 18-30, pan-India, Android only, expansion off. The Snap\
+  \ arm of the MOVE-ON lead funnel \u2014 one squad covering both of Meta's bands,\
+  \ since Snap is the secondary test here. LEAD_GENERATION objective with an on-platform\
+  \ form (first name/phone/email); the form's end page sends her to /get/w-apply with\
+  \ squad-level UTM literals plus ra_src=form, the marker the page admits without\
+  \ a per-lead id. Snap documents no macro for that URL, so per-lead join is absent\
+  \ BY PLATFORM LIMIT, accepted by the app owner 2026-08-29 in as many words \u2014\
+  \ attribution is at squad level. Same 30 percent male-mix kill number, same knowingly-accepted\
+  \ Rs 300 learning consequence. Creative is the STITCH cut from the app owner's own\
+  \ four Grok clips."
 targeting:
   gender: FEMALE
   min_age: '18'
-  max_age: '24'
+  max_age: '30'
   countries:
   - in
   os: ANDROID
@@ -37,6 +37,7 @@ last_note: '2026-08-29'
 campaign_daily_cap_inr: null
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-29'
+executed: '2026-08-29'
 ---
 
 ## Brief (proposed)
@@ -327,8 +328,11 @@ enabled. This should become a pre-launch gate in the rules, not a habit.
 
 ## Note — observation (2026-08-29)
 
-Asset finished by the app owner 2026-08-29: Gabarito type, licensed/Sound Collection music replacing the scratch bed, 1080x1920 render, watermark cropped. The ROUGH v3 in the session scratchpad was picture lock only. Native-speaker read of every Hinglish line also completed 2026-08-29 per the app owner — this was the spend gate, and it doubles as the Hindi compliance read since check-banned-strings.sh is English-only. Both pre-build gates from setup-checklist.md section 0 are now closed; remaining: compliance section 8 independent pass on the finished asset, then the Ads Manager build itself.
+Owner override recorded 2026-08-29 in creatives/moveon-lead-w1830/qa.md: the independent section-8 pass returned fail on the STITCH cut (men in frame in two scenes; ATHLETIC CLUB garment text; Western-reading settings; POV escalation on the closing close-up) and the app owner directed deployment anyway, in as many words, keeping 'Teen hafte' unchanged. Verdict left standing; override outranks it for this deployment only.
 
-## Note — observation (2026-08-29)
+## Execution
 
-Independent section-8 pass returned FAIL (men in party-scene background; AI craft glitches incl. whited-out eyes, split-frame, warped fingers, watermark remnant, 720p) with two escalates (library student-read vs 6.3; closing walk-to-camera tableau vs creative-generation 1). App owner overrode in session 2026-08-29 and directed the push; override recorded in creatives/moveon-lead-w1830/qa.md alongside the untouched verdict, d68ccb2-style. Meta review risk and the 30 percent male-mix kill number stand.
+- Date: 2026-08-29
+- Campaign ID: 1326aa05-902c-4cec-be92-0a7440ac536d
+- Ad set ID: 85c2e782-ea07-4216-8986-f272bdb5d4d7
+- Ad ID: 3c9d2884-b6e3-4137-98ed-2bfcb5f236d4

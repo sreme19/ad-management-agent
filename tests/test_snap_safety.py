@@ -80,3 +80,29 @@ class TestTheClientRefusesBeforeSending:
 
     def test_the_error_is_a_snaperror_so_nothing_swallows_it_by_type(self):
         assert issubclass(snapapi.SnapSafetyError, snapapi.SnapError)
+
+
+class TestTheLeadPathIsGuardedToo:
+    """The Snap lead path (2026-08-29) inherits the guard; assert it, don't assume it."""
+
+    def test_creating_a_lead_form_is_allowed(self):
+        from ad_management_agent.snap import _safety_violations
+        assert not _safety_violations("POST", {"lead_generation_forms": [{
+            "name": "RA_LEAD_WOMEN_18-30_CASUAL_MOVEON-LEAD_SNAP",
+            "form_fields": [{"type": "FIRST_NAME"}, {"type": "PHONE_NUMBER"}, {"type": "EMAIL"}],
+            "privacy_policy_url": "https://www.riteangle.dating/privacy-policy",
+            "end_page_properties": {"call_to_action": "VIEW_WEBSITE",
+                                    "url": "https://www.riteangle.dating/get/w-apply?ra_src=form"},
+        }]})
+
+    def test_a_lead_ad_created_active_is_refused(self):
+        from ad_management_agent.snap import _safety_violations
+        assert _safety_violations("POST", {"ads": [{
+            "name": "x", "type": "LEAD_GENERATION", "status": "ACTIVE"}]})
+
+    def test_a_paused_lead_adsquad_with_a_budget_is_allowed(self):
+        from ad_management_agent.snap import _safety_violations
+        assert not _safety_violations("POST", {"adsquads": [{
+            "name": "WOMEN_18-30_CASUAL_MOVEON-LEAD", "status": "PAUSED",
+            "optimization_goal": "LEAD_FORM_SUBMISSIONS",
+            "daily_budget_micro": 300000000}]})
