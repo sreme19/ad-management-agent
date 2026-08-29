@@ -575,9 +575,51 @@ class SnapClient:
         return [r.get("lead_generation_form") or r
                 for r in res.get("lead_generation_forms", [])]
 
+    # THE DOCS AND THE LIVE API DISAGREE ON CASING, so these read both.
+    #
+    # developers.snap.com documents the webhook response in camelCase
+    # ({"webhookIntegrations": [{"webhookIntegration": {"integrationId": ...}}]}).
+    # The live API answers in snake_case, like the rest of Snap
+    # ({"webhook_integrations": [{"webhook_integration": {"integration_id": ...}}]}).
+    # Both spellings cost real attempts to find: reading only the snake plural key
+    # `integrations` made `snap-leads forms` report all seven forms as having no
+    # webhook -- an empty list, no error, indistinguishable from the truth -- and
+    # then reading only the documented camelCase made a SUCCESSFUL registration
+    # raise, so the hmacSecret it returned was lost and the integration had to be
+    # deleted and recreated to see it again.
+    #
+    # A secret you get exactly one chance to read is the wrong place to be
+    # confident about a key name. These accept every spelling.
+    # The list endpoint uses a THIRD shape again: {"partner_integrations": [...]}
+    # with flat rows and the url buried in generic_webhook_handler_info. So the
+    # create response, the documented create response, and the list response are
+    # three different shapes for one object.
+    _WEBHOOK_KEYS = ("partner_integrations", "webhook_integrations",
+                     "webhookIntegrations", "integrations")
+
+    @staticmethod
+    def _webhook_rows(res: dict) -> list[dict]:
+        rows = next((res[k] for k in SnapClient._WEBHOOK_KEYS if res.get(k)), [])
+        return [r.get("webhook_integration") or r.get("webhookIntegration")
+                or r.get("integration") or r for r in rows]
+
+    @staticmethod
+    def webhook_id(row: dict) -> str | None:
+        return row.get("integration_id") or row.get("integrationId") or row.get("id")
+
+    @staticmethod
+    def webhook_url(row: dict) -> str | None:
+        nested = row.get("generic_webhook_handler_info") or {}
+        return (row.get("webhook_url") or row.get("webhookUrl")
+                or nested.get("webhook_url") or nested.get("webhookUrl"))
+
+    @staticmethod
+    def webhook_secret(row: dict) -> str | None:
+        return row.get("hmac_secret") or row.get("hmacSecret")
+
     def list_lead_webhooks(self, form_id: str) -> list[dict]:
         res = self.get(f"/lead_gen/forms/{form_id}/integrations?partner_type=PUBLIC_WEBHOOK")
-        return [r.get("integration") or r for r in res.get("integrations", [])]
+        return self._webhook_rows(res)
 
     def register_lead_webhook(self, *, form_id: str, webhook_url: str) -> dict:
         """Point one form's submissions at our endpoint.
@@ -598,16 +640,24 @@ class SnapClient:
         """
         existing = self.list_lead_webhooks(form_id)
         if existing:
-            ids = ", ".join(e.get("id", "?") for e in existing)
-            urls = ", ".join(e.get("webhook_url", "?") for e in existing)
+            ids = ", ".join(self.webhook_id(e) or "?" for e in existing)
+            urls = ", ".join(self.webhook_url(e) or "?" for e in existing)
             raise SnapError(
                 f"form {form_id} already has a webhook integration ({ids} -> {urls}).\n"
                 "Snap allows one per form. Delete it first if you mean to re-point it:\n"
                 f"  ad-agent snap-leads delete --integration-id {ids}"
             )
+        # Wrapped in a list under a plural key, like every other Snap creation.
         res = self.post("/lead_gen/integrations/public_webhook",
-                        {"form_id": form_id, "webhook_url": webhook_url})
-        return res.get("integration") or res
+                        {"webhook_integrations": [
+                            {"form_id": form_id, "webhook_url": webhook_url}]})
+        rows = next((res[k] for k in self._WEBHOOK_KEYS if res.get(k)), [])
+        if not rows:
+            raise SnapError(f"no integration in the response: {json.dumps(res)[:400]}")
+        status = rows[0].get("sub_request_status") or rows[0].get("subRequestStatus")
+        if status not in (None, "200", "SUCCESS"):
+            raise SnapError(f"integration rejected: {json.dumps(rows[0])[:400]}")
+        return self._webhook_rows(res)[0]
 
     def test_lead_webhook(self, integration_id: str) -> dict:
         """Ask Snap to fire a sample delivery at the registered URL."""

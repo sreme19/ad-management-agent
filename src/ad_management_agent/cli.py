@@ -391,7 +391,8 @@ def cmd_snap_leads(args: argparse.Namespace, ledger: Ledger) -> None:
             return
         for f in forms:
             hooks = client.list_lead_webhooks(f.get("id", ""))
-            where = hooks[0].get("webhook_url") if hooks else "-- no webhook, leads stay in Ads Manager"
+            where = (client.webhook_url(hooks[0]) if hooks
+                     else "-- no webhook, leads stay in Ads Manager")
             print(f"{f.get('id')}  {f.get('name')}\n    -> {where}")
         return
 
@@ -401,14 +402,14 @@ def cmd_snap_leads(args: argparse.Namespace, ledger: Ledger) -> None:
             print(f"form {args.form_id} has no webhook integration")
             return
         for h in hooks:
-            print(f"{h.get('id')}  {h.get('webhook_url')}")
+            print(f"{client.webhook_id(h)}  {client.webhook_url(h)}")
         return
 
     if args.action == "register":
         integration = client.register_lead_webhook(
             form_id=args.form_id, webhook_url=args.url)
-        secret = integration.get("hmacSecret") or integration.get("hmac_secret")
-        print(f"registered: {integration.get('id')} -> {args.url}")
+        secret = client.webhook_secret(integration)
+        print(f"registered: {client.webhook_id(integration)} -> {args.url}")
         if secret:
             # Printed once, on purpose. Snap does not return it from the list
             # endpoint later, and the receiver cannot authenticate a single
