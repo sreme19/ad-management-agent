@@ -1,4 +1,4 @@
-# Creative generation rules — Grok Imagine prompts and the plate/type split
+# Creative generation rules — the generation pipeline, prompts, and the plate/type split
 
 Source: Sree's 2026-08-24 session, working back from the first four live Snap/Meta assets
 (`SC_AD_IMG_CONNECTION`, `SC_AD_IMG_V1_DONTSETTLE`, `RA_LEAD_WOMEN_SNAP1_20260818`,
@@ -50,6 +50,29 @@ Reasons, in order of how much they cost when ignored:
 The plate carries: subject, setting, lighting, wardrobe, palette, composition, and deliberate empty
 space where type will land. Say where the empty space goes in the prompt.
 
+## 2b. The pipeline — Flow builds frames, Grok animates them
+
+Established 2026-08-30 on the Riteangle BUILD-YOURSELF-FIRST cut, by A/B on the same start frame.
+
+- **Google Flow for still frames, Grok Imagine for motion.** Flow holds character identity, wardrobe
+  and set across many frames; Grok does not have a character system at all. Grok performs the described
+  action; Flow tends to return a held pose. Feeding a Flow frame into Grok as the image input carries
+  identity through, and is what let the woman drained in scene 1 be the same woman at the turn — the
+  failure recorded in `lrn-2026-08-29-flow-character-reference-is-unreliable`.
+- **Never animate from a frame that already shows the end of the action.** The clip will hold that state
+  for its whole duration. Brief every start frame as the *first* moment of the beat; the iconic moment
+  is what the clip should arrive at, not start from.
+- **A two-state transition works from one frame.** Posture, expression and a full colour-grade flip can
+  happen inside a single Grok clip if the prompt describes it as one continuous transformation. No
+  start-frame/end-frame interpolation is needed for a turning-point shot.
+- **Aspect ratio follows image count in Grok.** With ONE image attached, output inherits that image's
+  aspect and prompt instructions about it are ignored. With SEVERAL attached, the 9:16 control stays
+  live and is respected — so the existing 16:9 frame library is usable for vertical work, and a
+  multi-image upload also yields a continuous multi-beat sequence from one generation. Always upload in
+  batches.
+- **Flow's saved-character assets do not reliably resolve by name** and can be silently broken. Attach
+  the actual frames as references instead of relying on an @name.
+
 ## 3. Prompt skeleton
 
 Write every prompt in this order. It keeps the compliance-relevant clauses in fixed positions so QA can
@@ -88,9 +111,27 @@ ballroom, no gown."
   the product's own AI-enhanced portraits render him.
 - Anyone who could read as under 18. No exceptions, no ambiguity — Snap's dating category enforces this
   on top of our own rule.
+- **A woman positioned on a bed**, even fully clothed and non-sexual — it trips the image content filter
+  reliably. For the alone-at-night beat, stage her on the floor with her back against the side of the
+  bed, framed chest-up. Passes first time and reads stronger.
+- **Concealment verbs describing a partner** — "hiding his phone", "tilting it away so she can't see".
+  Also filter-blocked. Write the behaviour neutrally: "looking down at his own phone, face turned
+  away." The emotional read is identical.
 
 **Always specify:** Indian models, Indian-context setting, contemporary and ordinary rather than
 aspirational-luxury, 18+ and unambiguously adult.
+
+**Always name the wardrobe for the activity.** Generators inherit clothing from the reference frame and
+will never correct it for plausibility. Left unstated, a competitiveness beat came back with her serving
+on a tennis court in jeans, and a career beat had her presenting to a boardroom in a vest top — both
+arguing against the very thing the shot existed to say. On an ad about competence, wardrobe is
+load-bearing: name the kit.
+
+**Devanagari needs a shaping-capable text engine.** Overlay type set in Devanagari through a pipeline
+without complex-script shaping returns mis-ordered matras — the i-matra lands after its consonant rather
+than before. Latin renders correctly. This agrees, for unrelated reasons, with
+`lrn-2026-08-29-roman-script-is-an-audience-signal`: romanised Hinglish is the default. A Devanagari cut
+must have its type pass done in a real editor.
 
 ## 5. Palette, and the dark-creative trap
 
@@ -127,6 +168,30 @@ is allowed to say "variant B is a UI render, not a Grok asset" and stop there.
   emotional beat lands in the first two seconds; anything that needs a build lands better as a still.
 - Keep the bottom ~15% and top ~10% clear of anything load-bearing — the platform's own chrome, CTA
   pill and profile row sit there. All four current assets crowd the CTA.
+- **Brief headroom and edge margin so a watermark crop is always available.** Grok stamps a wordmark
+  bottom-right; Flow stamps sparkles in the top corners. Remove them by cropping and rescaling, never by
+  inpainting — `delogo` leaves a smear that draws more attention than the mark did. Delivery upscales
+  720×1280 to 1080×1920 anyway, so `crop=693:1232` costs nothing and holds exact 9:16.
+
+## 7b. Audio and music
+
+The rules layer had no audio section before 2026-08-30; these come from building the first cut with a
+generated score.
+
+- **A single music bed across the whole cut**, not the clips' own audio — clip audio also masks the
+  shots having been generated separately. `Meta Sound Collection or Flow-generated audio only`; a
+  commercial track is a licensing problem on a paid ad.
+- **Never build a bed by looping one short clip.** It reads as interruptive no matter how clean the
+  crossfades are, and the objection survives changing the instrument — repetition is the cause, not
+  the sound. Chain several *different* generations end to end instead. Budget for several.
+- **Flow's Extend is gated on Veo AND ≥720p.** A 360p clip returns "360p videos cannot be extended"; a
+  non-Veo model returns "Only Veo-generated videos can be extended". If a bed longer than one
+  generation is needed, choose Veo at 720p up front — it cannot be retrofitted.
+- **Never normalise the finished mix.** Loudness normalisation across the sum destroys an intentional
+  quiet-to-loud arc — an 11 dB lift collapsed to 1.1 dB. Set each bed to its own target, then peak-limit
+  only. −16 LUFS integrated with true peak −1.5 dB is right for Meta and Snap.
+- **The cut must work muted.** Most views are silent, so the type carries the whole argument. Music
+  raises the ceiling; it can never be load-bearing.
 
 ## 8. Variant discipline
 
