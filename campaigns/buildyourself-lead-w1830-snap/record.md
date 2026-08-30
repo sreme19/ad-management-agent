@@ -133,3 +133,7 @@ FIRST 25-second asset this account has run; every prior video was 8s or under. S
   asset was broken; identity carried because the frames themselves were fed into Grok
   as image inputs. Corrected in this record and in
   `creatives/buildyourself-lead-w1830/brief.md`. No proposal field changed.
+
+## Note — creative (2026-08-30)
+
+App owner reviewed this session's Sarvam-AI voiceover-narrated draft of the creative (Shreya reading the on-screen captions, mixed under the existing music bed) and rejected it outright as 'terribly bad,' without diagnosing a specific defect. No change was made to the shipped asset-a.mp4 or to this ad's PAUSED status — the narration was a rough preview only, never merged in. See lrn-2026-08-30-buildyourself-vo-rejected. Do not resume the read-the-captions-aloud VO approach on this creative without a concrete diagnosis of what was wrong.

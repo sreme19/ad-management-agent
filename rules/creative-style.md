@@ -58,6 +58,14 @@ ad. Slugs are uppercase, hyphenated, no underscores (the ad name is underscore-d
   `lrn-2026-08-27-hinglish-is-shaadis-hook-mechanic`. Carries an unresolved risk: no comment-moderation
   policy exists for the hostility a breakup hook attracts — surface it again before anything is
   enabled.)*
+- **`BUILD-YOURSELF-FIRST`** — the MOVE-ON-PROPER "how" argument sharpened to one line: you can't
+  change him, you can build yourself. Four women, four bad experiences, one shared turn, then six
+  beats of self-development. Deliberately not "this happened because you weren't focused on
+  yourself" — that reads as blaming her for being catfished. *(Added 2026-08-30, registering a slug
+  that was already in production use: `VID_BUILD-YOURSELF-FIRST_A_20260830` shipped under this name
+  before the thread was written down here, which is the gap this entry closes. Origin:
+  `creatives/buildyourself-lead-w1830/brief.md`; QA `pass` on the shipped video recorded in that
+  creative's `qa.md`.)*
 
 ## Quotable first-party stats — use these, not invented or industry-borrowed numbers
 

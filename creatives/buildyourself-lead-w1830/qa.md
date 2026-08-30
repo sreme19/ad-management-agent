@@ -48,3 +48,21 @@ instrument readings, not a substitute for the owner's judgement.
    explicitly is now carried in the Grok prompt notes.
 4. **Romanised Hinglish, not Devanagari**, consistent with
    `lrn-2026-08-29-roman-script-is-an-audience-signal`.
+
+## Post-pass exploration, rejected (2026-08-30)
+
+This `pass` verdict is for `asset-a.mp4` as shipped above — silent but for the two
+instrumental beds — and stands unchanged.
+
+A later session tried adding a voiceover on top: Sarvam AI (Shreya) reading all 15
+on-screen lines verbatim, pauses trimmed to fit near the 25.2s runtime, mixed under
+the existing music bed at 35% volume as a rough preview. The app owner watched it and
+rejected it outright as "terribly bad," without diagnosing a specific defect (voice
+choice, sync, redundancy of narrating text already on screen, and mix level are all
+still open). See `lrn-2026-08-30-buildyourself-vo-rejected` and the note on
+`rec-2026-08-30-buildyourself-lead-w1830-snap`.
+
+No change was made to `asset-a.mp4` or the live PAUSED ad. The rejected drafts are
+kept, not deleted, in `_source/audio-beds/voiceover-drafts/` for reference. Do not
+resume the read-the-captions-aloud approach on this creative without a concrete
+diagnosis of what was wrong.
