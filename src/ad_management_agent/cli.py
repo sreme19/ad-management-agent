@@ -22,6 +22,7 @@ from . import networks as networkreg
 from . import research as researchmod
 from . import snap as snapapi
 from . import targeting as targetingspec
+from . import watermark as watermarkgate
 from .config import load_config
 from .ledger import STATUSES, Ledger
 
@@ -487,6 +488,19 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10",
               file=sys.stderr)
         raise SystemExit(2)
+    # Watermark gate — same recorded-clearance requirement as snap-push-story, after
+    # the 2026-08-30 live-sparkle incident. See watermark.py.
+    try:
+        watermarkgate.require_clearance(qa)
+    except watermarkgate.WatermarkNotCleared as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+    if media_type == "IMAGE":
+        print("watermark  qa.md clearance recorded; advisory corner scan:")
+        try:
+            print(f"           {watermarkgate.scan(asset)}")
+        except Exception as exc:  # noqa: BLE001 — advisory only, never block a cleared push
+            print(f"           (advisory scan skipped: {exc})")
 
     start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
     end = start + _dt.timedelta(days=int(fm["duration_days"]))
@@ -707,6 +721,22 @@ def cmd_snap_push_story(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10",
               file=sys.stderr)
         raise SystemExit(2)
+    # Watermark gate (added after 2026-08-30, when a Story Ad shipped with Google's
+    # "made with AI" sparkle baked into several plates). The qa.md must record an
+    # explicit clearance; then print the advisory corner scan so the plates that most
+    # warrant an eyeball are named. See watermark.py for why this is a recorded-check
+    # gate rather than a pixel pass/fail.
+    try:
+        watermarkgate.require_clearance(qa)
+    except watermarkgate.WatermarkNotCleared as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+    print("watermark  qa.md clearance recorded; advisory corner scan:")
+    try:
+        for hit in watermarkgate.advise(beat_assets):
+            print(f"           {hit}")
+    except Exception as exc:  # noqa: BLE001 — advisory only, never block a cleared push
+        print(f"           (advisory scan skipped: {exc})")
 
     start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
     end = start + _dt.timedelta(days=int(fm["duration_days"]))
@@ -731,6 +761,7 @@ def cmd_snap_push_story(args: argparse.Namespace, ledger: Ledger) -> None:
                          f'{fm["duration_days"]}d, SWIPES, AUTO_BID')),
         ("ad         ", f'{fm["ad_name"]}  (COMPOSITE, {len(STORY_BEATS)} snaps in sequence)'),
         ("sequence   ", " -> ".join(STORY_BEATS)),
+        ("cta        ", f'{args.cta}  (swipe-up chip on every leaf snap)'),
         ("destination", fm["destination_url"]),
         ("targeting  ", targetingspec.describe(spec)),
     ]
@@ -813,7 +844,7 @@ def cmd_snap_push_story(args: argparse.Namespace, ledger: Ledger) -> None:
         creative = client.create_creative(
             name=name, media_id=media["id"],
             headline=args.headline, brand_name="riteangle", url=provisional,
-            profile_id=config["snap"]["profile_id"])
+            profile_id=config["snap"]["profile_id"], call_to_action=args.cta)
         leaf_ids.append(creative["id"])
         print(f"  snap {beat:12} media {media['id']}  creative {creative['id']}")
 
@@ -875,6 +906,7 @@ def cmd_snap_push_story(args: argparse.Namespace, ledger: Ledger) -> None:
          leaf_ids),
         ("composite preview_creative_id", composite_live.get("preview_creative_id"), preview["id"]),
         ("ad points at composite", ad_live.get("creative_id"), composite["id"]),
+        ("first leaf CTA", first_leaf_live.get("call_to_action"), args.cta),
         ("first leaf landing url", first_leaf_live.get("web_view_properties", {}).get("url"), final_url),
     ]
     bad = 0
@@ -2369,6 +2401,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Snap headline for every leaf snap, 34 chars max")
     sp.add_argument("--preview-headline", default="Move on, properly.",
                     help="headline on the Story tile shown before it's tapped open, 55 chars max")
+    sp.add_argument("--cta", default="APPLY_NOW",
+                    help="Snap CTA-button label on every leaf snap's swipe-up chip "
+                         "(e.g. APPLY_NOW, MORE, SIGN_UP, LEARN_MORE); default APPLY_NOW to "
+                         "match the end card and the /get/w-apply funnel")
     sp.add_argument("--dry-run", action="store_true",
                     help="print the plan and create nothing")
     sp.add_argument("--accept-campaign-cap", action="store_true",

@@ -550,14 +550,19 @@ class SnapClient:
             raise SnapError(f"media upload -> HTTP {e.code}\n{e.read().decode()[:500]}") from e
         return media
 
-    def create_creative(self, *, name, media_id, headline, brand_name, url, profile_id) -> dict:
+    def create_creative(self, *, name, media_id, headline, brand_name, url, profile_id,
+                        call_to_action="MORE") -> dict:
+        """`call_to_action` is the Snap CTA-button label enum (e.g. MORE, APPLY_NOW,
+        SIGN_UP, LEARN_MORE). Defaults to MORE — the historical single-image value —
+        but the Story push passes APPLY_NOW so the swipe-up chip matches the ad's own
+        "Apply now" end card and the /get/w-apply funnel (Sree's call, 2026-08-30)."""
         if len(headline) > 34:
             raise SnapError(f"headline is {len(headline)} chars; Snap's limit is 34: {headline!r}")
         res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/creatives", {"creatives": [{
             "ad_account_id": self.cfg["ad_account_id"],
             "name": name, "type": "WEB_VIEW",
             "headline": headline, "brand_name": brand_name,
-            "call_to_action": "MORE", "shareable": True,
+            "call_to_action": call_to_action, "shareable": True,
             "top_snap_media_id": media_id,
             "web_view_properties": {"url": url},
             "profile_properties": {"profile_id": profile_id},

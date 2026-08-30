@@ -18,6 +18,7 @@
 | rec-2026-08-30-buildyourself-carousel-l-w1830-snap | snap | abandoned | RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608 | 85c2e782-ea07-4216-8986-f272bdb5d4d7 |  | 2026-08-30 |
 | rec-2026-08-30-buildyourself-carousel-m-w1830-snap | snap | abandoned | RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608 | 85c2e782-ea07-4216-8986-f272bdb5d4d7 |  | 2026-08-30 |
 | rec-2026-08-30-buildyourself-lead-w1830-snap | snap | live | RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608 | 85c2e782-ea07-4216-8986-f272bdb5d4d7 |  | 2026-08-30 |
+| rec-2026-08-30-buildyourself-story-b-w1830-snap | snap | proposed | RA_TRAFFIC_GETW_IN_PAN_TOF_202608 |  |  | 2026-08-30 |
 | rec-2026-08-30-buildyourself-story-w1830-snap | snap | live | RA_TRAFFIC_GETW_IN_PAN_TOF_202608 | 5d617ab4-1c7d-416c-9039-951bb888d892 |  | 2026-08-30 |
 | rec-2026-08-29-moveon-lead-w1824-meta | meta | live | RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608 | 6984366122081 |  | 2026-08-29 |
 | rec-2026-08-29-moveon-lead-w1830-snap | snap | live | RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608 | 85c2e782-ea07-4216-8986-f272bdb5d4d7 |  | 2026-08-29 |

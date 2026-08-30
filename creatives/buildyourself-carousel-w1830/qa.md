@@ -29,10 +29,16 @@ rule on a one-line steer.
    frame with a man in sharp, prominent focus (see `brief.md`) specifically to
    hold this line — flagging that trade explicitly rather than letting it pass
    unremarked, since the swapped-out frame is closer to the video's literal Act 1.
-3. **AI-tool watermark** — `g-win/asset-a.jpg` (the only slide sourced from a Grok
-   clip rather than a Flow still) was cropped `693:1232` before upscaling, same
-   as the shipped video; checked and clean. The Flow stills used elsewhere don't
-   carry a visible sparkle mark in the crops chosen.
+3. **AI-tool watermark — `watermark-check: pass` (re-cut 2026-08-30).** The first
+   cut of this carousel shipped live with Google's "made with AI" sparkle baked into
+   several Flow-sourced plates — the earlier claim here that the Flow stills carried
+   "no visible sparkle mark in the crops chosen" was simply wrong, and Sree caught it
+   by eye on the live ad. Every Flow still is now run through
+   `strip_flow_watermark` (150px off the bottom, where Flow's sparkle sits at a fixed
+   offset) in `build.py`, and all 13 plates + `preview.png` were re-checked at full
+   resolution by zooming each bottom-right corner: no sparkle survives on any. `g-win`
+   (the one Grok-sourced slide) stays cropped `693:1232` as before, clean. See
+   `rules/creative-generation.md` §7 and `src/ad_management_agent/watermark.py`.
 4. **Wordmark** — `m-endcard/asset-a.jpg`: lowercase `riteangle`, correct spelling,
    real Gabarito (not Futura — the font wasn't available when the video shipped;
    it is now).

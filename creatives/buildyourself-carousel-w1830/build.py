@@ -21,6 +21,10 @@ alongside the 13 JPEG snaps.
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 
+# Shared, single-source-of-truth watermark crop + advisory scan — so this build and
+# the push gate agree on how a Google/Flow "made with AI" sparkle is removed.
+from ad_management_agent.watermark import strip_flow_watermark, FLOW_WATERMARK_BOTTOM_CROP, scan
+
 FONT = "/Users/performek5/Desktop/Code/pocket-dating-coach/mobile/assets/fonts/Gabarito.ttf"
 D = Path(__file__).parent
 FR = D.parent / "buildyourself-lead-w1830/_source/frames"
@@ -32,6 +36,17 @@ WHITE = "#FFFFFF"
 SIZE = (1080, 1920)
 MARGIN = 84
 SAFE_TOP, SAFE_BOTTOM = 192, 1632
+
+# Every Flow (Google) still carries the "made with Google AI" sparkle stamped at a
+# fixed offset from the bottom-right corner -- ~98px up, ~96px in, the star spanning
+# up to ~137px above the bottom edge. Sree's call 2026-08-30: CROP it out, don't
+# inpaint -- remove real pixels rather than reconstruct them. strip_flow_watermark
+# (150px off the bottom) clears the whole star in both 768x1376 and 1376x768 exports,
+# while leaving the subject horizontally centred (no left/right crop). The crop amount
+# lives in ad_management_agent.watermark so the build and the push gate can't drift.
+def load_frame(name):
+    """Open a Flow source frame with the bottom watermark band already cropped off."""
+    return strip_flow_watermark(Image.open(FR / name).convert("RGB"))
 
 
 def face(size, weight="ExtraBold"):
@@ -53,8 +68,8 @@ def fit_lines(dr, text, size, weight, max_w):
 
 
 def prep_plate(src_name):
-    """Flow still -> exact 1080x1920, 9:16, centre-cropped."""
-    im = Image.open(FR / src_name).convert("RGB")
+    """Flow still -> exact 1080x1920, 9:16, centre-cropped (watermark band cropped)."""
+    im = load_frame(src_name)
     W, H = im.size
     tgt = W * 16 / 9
     if H > tgt:
@@ -75,8 +90,8 @@ def prep_extracted(src_name):
 
 def prep_grid(src_name):
     """For a full-width source (the 4-panel collage, or a plain landscape
-    group shot): fit full width, letterbox top/bottom in ink."""
-    im = Image.open(FR / src_name).convert("RGB")
+    group shot): fit full width, letterbox top/bottom in ink (watermark band cropped)."""
+    im = load_frame(src_name)
     W, H = im.size
     neww = SIZE[0]
     newh = int(H * neww / W)
@@ -191,3 +206,12 @@ _prev = Image.open(D / "a-ghosted" / "asset-a.jpg").convert("RGB").crop((0, 20, 
 assert _prev.size == (1080, 1800), _prev.size  # 3:5 exactly, no resize needed
 _prev.save(D / "preview.png")
 print(f"preview.png <- a-ghosted/asset-a.jpg, cropped to {_prev.size} (3:5, Snap's tile ratio)")
+
+# Advisory watermark scan -- points the eye at the strongest bright corner spot on
+# each built plate so a reviewer knows where to zoom. NOT a pass/fail (see
+# watermark.py): every Flow source went through strip_flow_watermark above, and the
+# real gate is the recorded `watermark-check: pass` in qa.md that the push enforces.
+print("\nCorner watermark advisory (crop already applied; look where peak is high):")
+for beat in ["a-ghosted", "b-catfish", "c-alone", "d-enough", "e-turn", "f-strength",
+             "g-win", "h-calm", "i-world", "j-joy", "k-career", "l-close", "m-endcard"]:
+    print(f"  {scan(D / beat / 'asset-a.jpg')}")

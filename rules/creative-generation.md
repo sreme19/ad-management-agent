@@ -169,9 +169,15 @@ is allowed to say "variant B is a UI render, not a Grok asset" and stop there.
 - Keep the bottom ~15% and top ~10% clear of anything load-bearing — the platform's own chrome, CTA
   pill and profile row sit there. All four current assets crowd the CTA.
 - **Brief headroom and edge margin so a watermark crop is always available.** Grok stamps a wordmark
-  bottom-right; Flow stamps sparkles in the top corners. Remove them by cropping and rescaling, never by
+  bottom-right; **Google Flow stamps a four-point "made with AI" sparkle in the bottom-right corner** at
+  a roughly fixed offset (~98px up on its native export). Remove them by cropping and rescaling, never by
   inpainting — `delogo` leaves a smear that draws more attention than the mark did. Delivery upscales
   720×1280 to 1080×1920 anyway, so `crop=693:1232` costs nothing and holds exact 9:16.
+- **Every Google/Flow/Gemini-exported still MUST pass through `strip_flow_watermark`** (in
+  `src/ad_management_agent/watermark.py`, 150px off the bottom) before it is used in any creative — this
+  is not optional and not per-frame judgement. On 2026-08-30 a live Story Ad shipped with the sparkle
+  baked into several plates because a QA note *asserted* the Flow stills were clean without zooming the
+  corners. The crop is the guarantee; the eyeball is the check. Do both, on every asset, every time.
 
 ## 7b. Audio and music
 
@@ -192,6 +198,13 @@ generated score.
   only. −16 LUFS integrated with true peak −1.5 dB is right for Meta and Snap.
 - **The cut must work muted.** Most views are silent, so the type carries the whole argument. Music
   raises the ceiling; it can never be load-bearing.
+- **Snap has no audio library for a tap-through Story Ad.** Confirmed live 2026-08-30 in Ads Manager's
+  own creative editor for a COMPOSITE web-view Story Ad: the story and each of its snaps expose only
+  attachment / URL / CTA / favouriting / prefetch — no music, sound, or audio control anywhere. Snap's
+  "Sounds" library is offered for Single Image/Video ad formats, not this one. So a Story Ad built from
+  stills carries no soundtrack, full stop — do not promise "one bed across the tiles" on this format
+  (the whole reason the muted-legibility rule above matters most here). If music is a hard requirement,
+  the format has to be a single video ad, not a Story Ad.
 
 ## 8. Variant discipline
 
@@ -224,12 +237,20 @@ Check the rendered asset **as an image**, not as copy:
 
 1. §4's negative list — any signifier present?
 2. §1's POV rule — who is the object of this frame?
-3. AI artefacts, watermark, garbled text, hands.
-4. Wordmark: present, lowercase, Gabarito, correct spelling.
-5. Legible at actual Story size on a phone, not just at desktop zoom.
-6. Cream or dark — and if dark, is there a stated reason?
-7. Safe areas (§7) clear of the platform's chrome.
+3. **AI-generation watermark — zoom every corner of every asset at full resolution.** Not "the crop
+   looks fine", not "the source was clean" — actually zoom the bottom-right corner of each plate (where
+   Google Flow's sparkle and Grok's wordmark both sit) and confirm no mark survives. Google/Flow stills
+   must already have gone through `strip_flow_watermark` (§7). When clear, record the literal line
+   **`watermark-check: pass`** in `qa.md` — the Snap push (`snap-push`, `snap-push-story`) refuses to
+   create a single object without it, and prints an advisory corner scan naming the plates most worth a
+   second look. This is a gating item after the 2026-08-30 live-sparkle incident, not a soft reminder.
+4. Other AI artefacts, garbled text, hands.
+5. Wordmark: present, lowercase, Gabarito, correct spelling.
+6. Legible at actual Story size on a phone, not just at desktop zoom.
+7. Cream or dark — and if dark, is there a stated reason?
+8. Safe areas (§7) clear of the platform's chrome.
 
 Verdict is one of **`pass`** · **`regenerate`** (naming the exact prompt clause to change) ·
 **`escalate`** (a `compliance.md` hit — the app owner's decision, never a quiet edit). Record it in
-`creatives/<slug>/qa.md`. Nothing reaches `ad-agent propose` without a `pass`.
+`creatives/<slug>/qa.md`. Nothing reaches `ad-agent propose` without a `pass`, and nothing reaches a
+Snap push without a `watermark-check: pass`.

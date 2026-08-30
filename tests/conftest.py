@@ -28,7 +28,8 @@ def ledger_root(tmp_path, monkeypatch) -> Path:
 
     creative = tmp_path / "creatives" / "test-asset"
     creative.mkdir(parents=True)
-    creative.joinpath("qa.md").write_text("Finished-asset gate — Verdict: `pass`\n")
+    creative.joinpath("qa.md").write_text(
+        "Finished-asset gate — Verdict: `pass`\nwatermark-check: pass\n")
     creative.joinpath("prompts.md").write_text("the prompt, with no outcome attached yet\n")
     creative.joinpath("asset-a.jpg").write_bytes(b"\xff\xd8\xff\xe0")
 
