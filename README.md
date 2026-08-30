@@ -130,6 +130,7 @@ did; `wiki-export/Command-Cheatsheet.md` carries the same list with the reasonin
 | `propose` | Record a mode-5 recommendation before you execute it |
 | `snap-leads` | Register/inspect where Snap delivers lead-form submissions (webhook, per form) |
 | `snap-push` | Create a proposed recommendation in Snap Ads Manager, PAUSED, then diff it back |
+| `snap-push-story` | Create a proposed Story Ad (COMPOSITE: a tap-through sequence of WEB_VIEW snaps) on Snap, PAUSED, then diff it back |
 | `meta-push` | Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back |
 | `snap-push-lead` | Create a proposed LEAD recommendation (video + on-platform form) on Snap, PAUSED, then diff it back |
 | `meta-push-lead` | Create a proposed LEAD recommendation (video + instant form) in Meta, PAUSED, then diff it back |
@@ -171,6 +172,12 @@ ad-agent snap-leads [-h] [--form-id FORM_ID] [--url URL] [--integration-id INTEG
 ad-agent snap-push [-h] [--headline HEADLINE] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
+#### `snap-push-story`
+
+```
+ad-agent snap-push-story [-h] [--headline HEADLINE] [--preview-headline PREVIEW_HEADLINE] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
 #### `meta-push`
 
 ```
@@ -180,7 +187,7 @@ ad-agent meta-push [-h] [--headline HEADLINE] [--message MESSAGE] [--cta CTA] [-
 #### `snap-push-lead`
 
 ```
-ad-agent snap-push-lead [-h] --video VIDEO [--headline HEADLINE] [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
+ad-agent snap-push-lead [-h] (--video VIDEO | --image IMAGE) [--headline HEADLINE] [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
 #### `meta-push-lead`

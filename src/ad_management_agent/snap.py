@@ -277,7 +277,7 @@ class SnapClient:
 
     # ---- ad squad --------------------------------------------------------
     def create_adsquad(self, *, name, campaign_id, targeting, daily_budget_inr,
-                       start_time, end_time, pixel_id) -> dict:
+                       start_time, end_time, pixel_id, optimization_goal="LANDING_PAGE_VIEW") -> dict:
         """Create the ad squad, PAUSED.
 
         `pixel_id` is required because every other LANDING_PAGE_VIEW squad in this
@@ -291,6 +291,17 @@ class SnapClient:
         not blind the optimisation goal. It was briefly diagnosed that way here, from
         a `conversion_page_views: 0` reading against the wrong stats field, and that
         was wrong.
+
+        `optimization_goal` defaults to `LANDING_PAGE_VIEW`, the only goal every
+        caller before 2026-08-30 used. A `STORY`-type ad squad rejects that goal
+        outright on this account/pixel — not just its default conversion window;
+        every `conversion_window` value this module tried (13 of them, live) was
+        refused the same way, `E2899 Invalid conversion window given for
+        optimization goal`, which is Snap's account/pixel-eligibility system
+        saying LANDING_PAGE_VIEW is not offered for a Story squad here at all, not
+        a window mismatch. `SWIPES` was confirmed live to accept both the ad squad
+        and a real STORY ad under it; pass it explicitly for a squad meant to hold
+        a Story ad.
         """
         if not pixel_id:
             raise SnapError(
@@ -305,7 +316,7 @@ class SnapClient:
             "type": "SNAP_ADS",
             "status": "PAUSED",
             "targeting": targeting,
-            "optimization_goal": "LANDING_PAGE_VIEW",
+            "optimization_goal": optimization_goal,
             "billing_event": "IMPRESSION",
             "bid_strategy": "AUTO_BID",
             "daily_budget_micro": int(daily_budget_inr * MICRO),
@@ -373,6 +384,30 @@ class SnapClient:
             raise SnapError(
                 f"{len(hits)} ads under ad squad {ad_squad_id} are named {name!r} "
                 f"({ids}). Refusing to guess — rename or delete the duplicate first."
+            )
+        return hits[0] if hits else None
+
+    def find_creative(self, name: str) -> dict | None:
+        """Exact-name lookup across every creative on the account, any type.
+
+        Added 2026-08-30 for `snap-push-story`: 15 creative objects for one Story
+        ad (13 leaves, 1 preview, 1 composite) is by far the most this module
+        creates in one run, and the account has no per-ad-squad scoping for
+        creatives the way `find_ad` gets from `find_adsquad` — they live at the
+        ad-account level. A run that dies partway (as `snap-push-story`'s first
+        real attempt did, on the preview creative's media format) must resume by
+        finding what already exists, not by re-uploading media and re-creating
+        creatives it already made.
+        """
+        res = self.get(f"/adaccounts/{self.cfg['ad_account_id']}/creatives")
+        rows = [r.get("creative") or r for r in res.get("creatives", [])]
+        hits = [c for c in rows if c.get("name") == name]
+        if len(hits) > 1:
+            ids = ", ".join(h.get("id", "?") for h in hits)
+            raise SnapError(
+                f"{len(hits)} creatives are named {name!r} ({ids}). Refusing to "
+                "guess — Snap's own creatives page has no create-then-find-by-name "
+                "guard, so this can happen; delete the duplicate before retrying."
             )
         return hits[0] if hits else None
 
@@ -546,11 +581,86 @@ class SnapClient:
         return self._one(self.put(f"/adaccounts/{self.cfg['ad_account_id']}/creatives",
                                   {"creatives": [body]}), "creatives")
 
-    def create_ad(self, *, name, ad_squad_id, creative_id) -> dict:
+    def create_ad(self, *, name, ad_squad_id, creative_id, ad_type="REMOTE_WEBPAGE") -> dict:
+        """`ad_type` must match the creative's own category, but not by sharing its
+        name — the ad-type and creative-type enums are two different lists, and
+        Snap rejects any mismatch outright (E1008). Discovered live in three
+        rejections in a row: the default REMOTE_WEBPAGE against a COMPOSITE
+        creative, then a guessed ad_type="COMPOSITE" (not a recognized ad type at
+        all — E2002), then a guessed ad_type="SNAP_AD" (recognized, still the
+        wrong category). The real mapping, per developers.snap.com's Ads page,
+        which has an explicit ad-type<->creative-type table this repo had not read
+        until this ad needed it: a COMPOSITE creative pairs with ad_type="STORY".
+        REMOTE_WEBPAGE stays the default because every existing caller (a
+        WEB_VIEW creative) needs it."""
         return self._one(self.post(f"/adsquads/{ad_squad_id}/ads", {"ads": [{
             "ad_squad_id": ad_squad_id, "creative_id": creative_id,
-            "name": name, "type": "REMOTE_WEBPAGE", "status": "PAUSED",
+            "name": name, "type": ad_type, "status": "PAUSED",
         }]}), "ads")
+
+    # ---- story ads (COMPOSITE: a tappable sequence of WEB_VIEW snaps) -----
+    #
+    # Added 2026-08-30, after Sree caught this session shipping 13 separate
+    # single-image ads instead of the one tap-through sequence he'd actually
+    # asked for. Confirmed live (tapping the reference "Qurli" ad advanced to a
+    # second full-screen image under the same header/CTA) before any code was
+    # written. developers.snap.com's own text: a COMPOSITE creative's
+    # `composite_properties.creative_ids` holds 1-20 child creative ids, shown in
+    # the listed order, immutable once created — and only SNAP_AD, APP_INSTALL,
+    # WEB_VIEW and DEEP_LINK are supported as children. LEAD_GENERATION is
+    # explicitly NOT in that list, which is why this ad is WEB_VIEW -> /get/w and
+    # not a lead-gen ad, on Sree's own call once that conflict was surfaced.
+    #
+    # The exact shapes below (preview_properties, composite_properties, the ad's
+    # own `type`) are read off the docs, not verified against a prior successful
+    # push in this account — this is the first COMPOSITE object this module has
+    # ever created. Treat the first real attempt as the check, the same way this
+    # account's default_end_page shape and webhook casing were both settled by
+    # what the live API actually said, not by what the docs said it would say.
+
+    def create_preview_creative(self, *, name, media_id, headline, profile_id,
+                                logo_media_id=None) -> dict:
+        """The tile creative a Story Ad shows before it's tapped open.
+
+        `headline` here is the PREVIEW's own headline (55-char limit per Snap's
+        docs), a different field with a different limit than the 34-char
+        `headline` on every other creative type in this file. `profile_id` is
+        required here too (E2652 on a live attempt without it) even though the
+        preview has no CTA of its own — every creative on this account carries a
+        publisher identity, apparently including this one.
+        """
+        if len(headline) > 55:
+            raise SnapError(f"preview headline is {len(headline)} chars; Snap's limit is 55: {headline!r}")
+        props = {"preview_media_id": media_id, "preview_headline": headline}
+        if logo_media_id:
+            props["logo_media_id"] = logo_media_id
+        res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/creatives", {"creatives": [{
+            "ad_account_id": self.cfg["ad_account_id"],
+            "name": name, "type": "PREVIEW",
+            "preview_properties": props,
+            "profile_properties": {"profile_id": profile_id},
+        }]})
+        return self._one(res, "creatives")
+
+    def create_composite_creative(self, *, name, creative_ids, preview_creative_id, profile_id) -> dict:
+        """Wrap the ordered leaf creatives (and the preview tile) into one Story Ad creative.
+
+        `creative_ids` order is what the viewer sees and is immutable once
+        created per Snap's docs — get the sequence right before calling this.
+        `profile_id` required (E2652 on a live attempt without it), same as
+        `create_preview_creative` — every creative type on this account seems to
+        need a publisher identity regardless of whether it has its own CTA.
+        """
+        if not (1 <= len(creative_ids) <= 20):
+            raise SnapError(f"a composite creative takes 1-20 creative_ids, got {len(creative_ids)}")
+        res = self.post(f"/adaccounts/{self.cfg['ad_account_id']}/creatives", {"creatives": [{
+            "ad_account_id": self.cfg["ad_account_id"],
+            "name": name, "type": "COMPOSITE",
+            "composite_properties": {"creative_ids": creative_ids},
+            "preview_creative_id": preview_creative_id,
+            "profile_properties": {"profile_id": profile_id},
+        }]})
+        return self._one(res, "creatives")
 
     # ---- lead delivery ---------------------------------------------------
     #

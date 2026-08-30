@@ -653,6 +653,251 @@ def cmd_snap_push(args: argparse.Namespace, ledger: Ledger) -> None:
           f"    --ad-id {ad['id']}")
 
 
+STORY_BEATS = ["a-ghosted", "b-catfish", "c-alone", "d-enough", "e-turn", "f-strength",
+               "g-win", "h-calm", "i-world", "j-joy", "k-career", "l-close", "m-endcard"]
+
+
+def cmd_snap_push_story(args: argparse.Namespace, ledger: Ledger) -> None:
+    """Create a proposed Story Ad (COMPOSITE: a tap-through sequence) on Snap, PAUSED.
+
+    Added 2026-08-30, after `snap-push-lead`'s 13-separate-ads run was rolled back
+    for being the wrong format — Sree's actual ask was one ad the viewer taps
+    through image by image. Snap's own docs exclude LEAD_GENERATION from a
+    COMPOSITE's allowed child types, so this is WEB_VIEW, not lead-gen, on Sree's
+    call once that conflict was surfaced.
+
+    `creative_ref` here is a folder holding 13 subfolders in sequence order
+    (STORY_BEATS), each `<beat>/asset-a.jpg` — not the single `asset-a.jpg` per
+    folder that `snap-push`/`snap-push-lead` expect, because a Story ad's whole
+    point is the sequence. QA is still gated at `creative_ref/qa.md`, one pass for
+    the whole set, since the 13 images are unchanged from the (rolled-back) 13-ad
+    attempt — only the delivery mechanism changed.
+    """
+    config = load_config()
+    rec = ledger.find(args.rec_id)
+    fm = rec.front_matter
+
+    if fm.get("network") != "snap":
+        print(f"error: {args.rec_id} is network={fm.get('network')!r}, not snap", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        networkreg.require_creation(ledger.root / "rules", "snap", mode="paused-only")
+    except networkreg.NetworkError as exc:
+        _fail(exc)
+    if fm.get("status") != "proposed":
+        print(f"error: {args.rec_id} is {fm.get('status')!r}; push expects 'proposed'.",
+              file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        destinations.check(ad_set_name=fm["ad_set_name"], destination_url=fm["destination_url"],
+                           rules_dir=ledger.root / "rules")
+    except destinations.DestinationGateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    cdir = ledger.root / fm["creative_ref"]
+    beat_assets = [cdir / beat / "asset-a.jpg" for beat in STORY_BEATS]
+    missing = [str(p) for p in beat_assets if not p.exists()]
+    if missing:
+        print(f"error: missing {len(missing)} of {len(STORY_BEATS)} story beats under {cdir}:\n  "
+              + "\n  ".join(missing), file=sys.stderr)
+        raise SystemExit(2)
+    qa = cdir / "qa.md"
+    if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
+        print(f"error: no recorded QA pass in {qa} — see rules/creative-generation.md sec 10",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+    start = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
+    end = start + _dt.timedelta(days=int(fm["duration_days"]))
+    def iso(d):
+        return d.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    budget = float(fm["budget_cap_inr_per_day"])
+    spec = fm.get("targeting")
+    if not spec:
+        print(f"error: {args.rec_id} has no structured `targeting` block.", file=sys.stderr)
+        raise SystemExit(2)
+    try:
+        targetingspec.validate(spec)
+        targetingspec.check_matches_ad_set_name(spec, fm["ad_set_name"])
+    except targetingspec.TargetingError as exc:
+        _fail(exc)
+    targeting = targetingspec.to_snap(spec)
+
+    plan = [
+        ("campaign   ", fm["campaign_name"]),
+        ("ad squad   ", (f'{fm["ad_set_name"]}  Rs {budget:.0f}/day x '
+                         f'{fm["duration_days"]}d, SWIPES, AUTO_BID')),
+        ("ad         ", f'{fm["ad_name"]}  (COMPOSITE, {len(STORY_BEATS)} snaps in sequence)'),
+        ("sequence   ", " -> ".join(STORY_BEATS)),
+        ("destination", fm["destination_url"]),
+        ("targeting  ", targetingspec.describe(spec)),
+    ]
+    print(f"Plan for {args.rec_id} (everything created PAUSED):")
+    for k, v in plan:
+        print(f"  {k}  {v}")
+    # Said out loud, because it is a real difference from what the record's
+    # destination_url implies. LANDING_PAGE_VIEW is not offered for a STORY ad
+    # squad on this account/pixel -- confirmed live, every conversion_window
+    # value refused the same way -- so this squad optimises for swipe-throughs,
+    # not confirmed page arrivals. The destination and its lead capture are still
+    # real; only what Snap is bidding to maximise is different from a plain
+    # WEB_VIEW/LANDING_PAGE_VIEW ad.
+    print("  note         optimisation goal is SWIPES, not LANDING_PAGE_VIEW -- that goal is\n"
+          "               not offered for a Story ad squad on this account/pixel (confirmed live)")
+
+    client = None
+    try:
+        client = snapapi.SnapClient(config.get("snap") or {})
+    except snapapi.SnapError as exc:
+        if not args.dry_run:
+            _fail(exc)
+        print(f"\nnote: no Snap credentials, so the parent campaign's spend cap was NOT checked. ({exc})")
+
+    campaign = None
+    if client is not None:
+        campaign = client.find_campaign(fm["campaign_name"])
+        if campaign:
+            print(f"\ncampaign  reusing {campaign['id']}")
+        elif args.dry_run:
+            print(f"\ncampaign  {fm['campaign_name']} does not exist yet; would be created new")
+        else:
+            campaign = client.create_campaign(fm["campaign_name"], iso(start))
+            print(f"\ncampaign  created {campaign['id']}")
+
+    if campaign is not None:
+        caps = client.campaign_caps(campaign["id"])
+        _gate_campaign_caps(caps, squad_daily_inr=budget, duration_days=int(fm["duration_days"]),
+                            rec_id=args.rec_id, accept=args.accept_campaign_cap)
+        if not args.dry_run:
+            ledger.record_campaign_caps(args.rec_id, daily_inr=caps.get("daily_inr"),
+                                        lifetime_inr=caps.get("lifetime_inr"), today=_today())
+
+    if args.dry_run:
+        print("\n--dry-run: nothing created.")
+        return
+
+    squad = client.find_adsquad(fm["ad_set_name"], campaign["id"])
+    if squad:
+        print(f"ad squad  reusing {squad['id']} (already existed under this campaign)")
+    else:
+        squad = client.create_adsquad(name=fm["ad_set_name"], campaign_id=campaign["id"],
+                                      targeting=targeting, daily_budget_inr=budget,
+                                      start_time=iso(start), end_time=iso(end),
+                                      pixel_id=(config.get("snap") or {}).get("pixel_id"),
+                                      optimization_goal="SWIPES")
+        print(f"ad squad  created {squad['id']}")
+
+    # utm_id needs the ad id, which does not exist until the composite ad is
+    # created below — every leaf creative gets this same provisional URL first,
+    # same trick set_creative_url already uses for a single-image WEB_VIEW ad.
+    provisional = _utm_url(ledger.root / "rules", "snap", fm["destination_url"],
+                           fm["campaign_name"], squad["id"], "", fm["ad_name"])
+
+    # find_creative-then-create throughout: 15 creative objects for one Story ad
+    # (13 leaves, 1 preview, 1 composite) is the most this module has ever made in
+    # one run, and the first real attempt DID die partway (the preview media's
+    # format, below) — a retry has to resume by finding what already exists
+    # rather than re-uploading media and duplicating creatives it already made.
+    leaf_ids = []
+    print()
+    for beat, asset in zip(STORY_BEATS, beat_assets):
+        name = f'{fm["ad_name"]}_{beat.upper()}'
+        existing = client.find_creative(name)
+        if existing:
+            leaf_ids.append(existing["id"])
+            print(f"  snap {beat:12} reusing creative {existing['id']} (already existed)")
+            continue
+        media = client.upload_media(f'{name}_MEDIA', asset, media_type="IMAGE")
+        creative = client.create_creative(
+            name=name, media_id=media["id"],
+            headline=args.headline, brand_name="riteangle", url=provisional,
+            profile_id=config["snap"]["profile_id"])
+        leaf_ids.append(creative["id"])
+        print(f"  snap {beat:12} media {media['id']}  creative {creative['id']}")
+
+    preview_name = f'{fm["ad_name"]}_PREVIEW'
+    preview = client.find_creative(preview_name)
+    if preview:
+        print(f"preview   reusing {preview['id']} (already existed)")
+    else:
+        preview_png = cdir / "preview.png"
+        if not preview_png.exists():
+            print(f"error: no {preview_png} — Snap's PREVIEW-tile media rejects JPEG "
+                  "(\"Allowed extensions: png\"); the leaf snaps stay JPEG, only the "
+                  "preview tile needs a PNG export.", file=sys.stderr)
+            raise SystemExit(2)
+        preview_media = client.upload_media(f'{preview_name}_MEDIA', preview_png, media_type="IMAGE")
+        preview = client.create_preview_creative(
+            name=preview_name, media_id=preview_media["id"], headline=args.preview_headline,
+            profile_id=config["snap"]["profile_id"])
+        print(f"preview   creative {preview['id']}")
+
+    composite_name = f'{fm["ad_name"]}_COMPOSITE'
+    composite = client.find_creative(composite_name)
+    if composite:
+        print(f"composite reusing {composite['id']} (already existed)")
+    else:
+        composite = client.create_composite_creative(
+            name=composite_name, creative_ids=leaf_ids, preview_creative_id=preview["id"],
+            profile_id=config["snap"]["profile_id"])
+        print(f"composite creative {composite['id']}")
+
+    ad = client.find_ad(fm["ad_name"], squad["id"])
+    if ad:
+        print(f"ad        reusing {ad['id']} (already existed under this ad squad)")
+    else:
+        ad = client.create_ad(name=fm["ad_name"], ad_squad_id=squad["id"], creative_id=composite["id"],
+                             ad_type="STORY")
+        print(f"ad        created {ad['id']}")
+
+    final_url = _utm_url(ledger.root / "rules", "snap", fm["destination_url"],
+                         fm["campaign_name"], squad["id"], ad["id"], fm["ad_name"])
+    for beat, cid in zip(STORY_BEATS, leaf_ids):
+        creative = client.get(f"/creatives/{cid}")["creatives"][0]["creative"]
+        client.set_creative_url(creative, final_url)
+    print(f"creative  all {len(leaf_ids)} leaf landing URLs rewritten with the real ad id")
+
+    print("\nRead-back:")
+    squad_live = client.get(f"/adsquads/{squad['id']}")["adsquads"][0]["adsquad"]
+    ad_live = client.get(f"/ads/{ad['id']}")["ads"][0]["ad"]
+    composite_live = client.get(f"/creatives/{composite['id']}")["creatives"][0]["creative"]
+    first_leaf_live = client.get(f"/creatives/{leaf_ids[0]}")["creatives"][0]["creative"]
+
+    checks = [
+        ("ad squad status", squad_live.get("status"), "PAUSED"),
+        ("ad status", ad_live.get("status"), "PAUSED"),
+        ("daily budget", squad_live.get("daily_budget_micro"), int(budget * snapapi.MICRO)),
+        ("optimisation goal", squad_live.get("optimization_goal"), "SWIPES"),
+        *targetingspec.snap_readback_checks(spec, squad_live),
+        ("composite creative_ids", (composite_live.get("composite_properties") or {}).get("creative_ids"),
+         leaf_ids),
+        ("composite preview_creative_id", composite_live.get("preview_creative_id"), preview["id"]),
+        ("ad points at composite", ad_live.get("creative_id"), composite["id"]),
+        ("first leaf landing url", first_leaf_live.get("web_view_properties", {}).get("url"), final_url),
+    ]
+    bad = 0
+    for label, got, want in checks:
+        ok = str(got) == str(want)
+        bad += not ok
+        print(f"  {'ok ' if ok else 'DIFF'}  {label:28} {got}")
+        if not ok:
+            print(f"        {'':28} expected: {want}")
+
+    print()
+    if bad:
+        print(f"{bad} field(s) differ from the plan. Fix in Ads Manager before enabling.")
+    else:
+        print("Every field matches the plan.")
+    print("Nothing is live: all objects are PAUSED. Enabling is a human action in Ads Manager.")
+    print(f"\nWhen you have enabled it, close the loop:\n"
+          f"  ad-agent log-setup {args.rec_id} --network snap \\\n"
+          f"    --campaign-id {campaign['id']} \\\n"
+          f"    --ad-set-id {squad['id']} \\\n"
+          f"    --ad-id {ad['id']}")
+
+
 def _gate_campaign_budget_optimization(caps: dict, *, rec_id: str) -> None:
     """Refuse to hang an ad set off a Meta campaign that holds the budget itself.
 
@@ -2113,6 +2358,23 @@ def build_parser() -> argparse.ArgumentParser:
                     help="create anyway when the parent campaign's cap would bind, as a "
                          "stated deviation rather than a surprise")
     sp.set_defaults(func=cmd_snap_push)
+
+    sp = sub.add_parser(
+        "snap-push-story",
+        help="Create a proposed Story Ad (COMPOSITE: a tap-through sequence of WEB_VIEW "
+             "snaps) on Snap, PAUSED, then diff it back",
+    )
+    sp.add_argument("rec_id")
+    sp.add_argument("--headline", default="A shortlist that means something.",
+                    help="Snap headline for every leaf snap, 34 chars max")
+    sp.add_argument("--preview-headline", default="Move on, properly.",
+                    help="headline on the Story tile shown before it's tapped open, 55 chars max")
+    sp.add_argument("--dry-run", action="store_true",
+                    help="print the plan and create nothing")
+    sp.add_argument("--accept-campaign-cap", action="store_true",
+                    help="create anyway when the parent campaign's cap would bind, as a "
+                         "stated deviation rather than a surprise")
+    sp.set_defaults(func=cmd_snap_push_story)
 
     sp = sub.add_parser(
         "meta-push",

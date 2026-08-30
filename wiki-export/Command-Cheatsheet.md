@@ -38,6 +38,7 @@ below carry the reasoning; this block guarantees nothing is missing from them.
 | `propose` | Record a mode-5 recommendation before you execute it |
 | `snap-leads` | Register/inspect where Snap delivers lead-form submissions (webhook, per form) |
 | `snap-push` | Create a proposed recommendation in Snap Ads Manager, PAUSED, then diff it back |
+| `snap-push-story` | Create a proposed Story Ad (COMPOSITE: a tap-through sequence of WEB_VIEW snaps) on Snap, PAUSED, then diff it back |
 | `meta-push` | Create a proposed recommendation in Meta Ads Manager, PAUSED, then diff it back |
 | `snap-push-lead` | Create a proposed LEAD recommendation (video + on-platform form) on Snap, PAUSED, then diff it back |
 | `meta-push-lead` | Create a proposed LEAD recommendation (video + instant form) in Meta, PAUSED, then diff it back |
@@ -79,6 +80,12 @@ ad-agent snap-leads [-h] [--form-id FORM_ID] [--url URL] [--integration-id INTEG
 ad-agent snap-push [-h] [--headline HEADLINE] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
+#### `snap-push-story`
+
+```
+ad-agent snap-push-story [-h] [--headline HEADLINE] [--preview-headline PREVIEW_HEADLINE] [--dry-run] [--accept-campaign-cap] rec_id
+```
+
 #### `meta-push`
 
 ```
@@ -88,7 +95,7 @@ ad-agent meta-push [-h] [--headline HEADLINE] [--message MESSAGE] [--cta CTA] [-
 #### `snap-push-lead`
 
 ```
-ad-agent snap-push-lead [-h] --video VIDEO [--headline HEADLINE] [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
+ad-agent snap-push-lead [-h] (--video VIDEO | --image IMAGE) [--headline HEADLINE] [--form-id FORM_ID] [--dry-run] [--accept-campaign-cap] rec_id
 ```
 
 #### `meta-push-lead`
@@ -514,6 +521,57 @@ read-back-and-diff — with the differences the objective forces:
   `marketing_apply_gate` row carries a real `ra_lead` — not the literal braces. If the
   macro did not resolve, attribution falls back to ad-set level; do not enable until
   that is known.
+
+## "Create the STORY version on Snap for me" (a tap-through sequence)
+
+```bash
+ad-agent snap-push-story rec-2026-08-30-buildyourself-story-w1830-snap \
+  --headline "Move on, properly." --preview-headline "Move on, properly." --dry-run
+```
+
+Added 2026-08-30, after `snap-push-lead`'s 13-separate-ads run got rolled back for
+being the wrong format — Sree's actual ask was one ad the viewer taps through
+image by image, which Snap calls a Story Ad. It's a `COMPOSITE` creative: 1-20
+leaf creatives referenced by `composite_properties.creative_ids`, shown in the
+listed order (immutable once created), plus one `PREVIEW` creative for the tile
+shown before it's tapped open.
+
+**`LEAD_GENERATION` cannot be a leaf** — Snap's docs list only `SNAP_AD`,
+`APP_INSTALL`, `WEB_VIEW` and `DEEP_LINK` as supported composite children — so
+this command is `WEB_VIEW` throughout, TRAFFIC campaign, not a lead-gen ad. That
+conflict was surfaced to Sree before any code was written; he chose `WEB_VIEW` ->
+`/get/w` over keeping the lead form and dropping the sequence format.
+
+**The ad squad optimises for `SWIPES`, not `LANDING_PAGE_VIEW`**, even though the
+destination is a real landing page. `LANDING_PAGE_VIEW` is not offered for a
+`STORY`-type ad squad on this account/pixel at all — confirmed live: every one of
+13 `conversion_window` values tried was refused the same way (`E2899 Invalid
+conversion window given for optimization goal`), which is Snap's eligibility
+system declining the goal outright for this ad type here, not a window mismatch.
+`SWIPES` (billing event stays `IMPRESSION` — `billing_event: SWIPE` is rejected)
+was confirmed to accept both the ad squad and a real `STORY` ad under it. Getting
+here also needed `ad_type="STORY"` on the ad itself — not `"COMPOSITE"`, which
+looks like the obvious match to the creative's `type` but isn't a real ad-type
+value at all, and not `"SNAP_AD"`, which is real but wrong for this creative.
+Still needs a pixel, same as plain `snap-push`.
+
+`creative_ref` is a folder holding 13 subfolders in sequence order
+(`a-ghosted` .. `m-endcard`, `STORY_BEATS` in `cli.py`), each `<beat>/asset-a.jpg`
+— not the single `asset-a.jpg` per folder `snap-push`/`snap-push-lead` expect,
+because the sequence is the whole point. QA still gates at `creative_ref/qa.md`,
+one pass for the set: the 13 images are unchanged from the rolled-back 13-ad
+attempt, only the delivery mechanism is different.
+
+Every leaf snap gets its own upload (13 media + 13 creatives + 1 preview + 1
+composite = 15 creative objects, 14 media objects, for one ad), but shares one
+landing URL and one set of UTMs — there's only one ad, so `utm_id` only needs to
+carry one id. Same provisional-URL-then-rewrite trick as `snap-push`: every leaf
+creative's `web_view_properties.url` is set once with the ad squad's id as a
+placeholder, then rewritten on all 13 once the real ad (and its real id) exists.
+
+Everything PAUSED, same transport guard, same read-back-and-diff — checked against
+the composite's `creative_ids` order and `preview_creative_id`, and the first
+leaf's rewritten landing URL, not just squad/ad status.
 
 ## "Where do the leads actually go?" (`snap-leads`)
 

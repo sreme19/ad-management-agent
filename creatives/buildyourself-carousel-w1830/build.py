@@ -1,7 +1,6 @@
 """Type layer for the BUILD-YOURSELF-FIRST carousel — 13 stills re-cutting the
 shipped video (creatives/buildyourself-lead-w1830/asset-a.mp4) into a Snap photo
-sequence, per Sree's 2026-08-30 direction. Shipped as 13 separate single-image
-LEAD_GENERATION ads under the standing squad, not one Story-Ad sequence.
+sequence, per Sree's 2026-08-30 direction.
 
     uv run python creatives/buildyourself-carousel-w1830/build.py
 
@@ -10,6 +9,14 @@ no words and here the plates themselves are re-cut from assets this account
 already generated and QA'd once (buildyourself-lead-w1830/_source/frames/, plus
 one frame pulled from a Grok clip — see sourcing.md for the exact source of
 every slide). All type is set fresh in real Gabarito.
+
+Shipped as one Snap Story Ad (a tap-through COMPOSITE sequence, `snap-push-story`)
+— NOT as 13 separate single-image ads, which is how this was first (wrongly)
+built and pushed, then rolled back once Sree named the actual format he'd asked
+for. Also writes `preview.png`: Snap's PREVIEW-tile media rejects JPEG outright
+("Allowed extensions: png", discovered live on the first `snap-push-story` run,
+not in advance from the docs), so the Story tile needs its own PNG export
+alongside the 13 JPEG snaps.
 """
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
@@ -172,3 +179,15 @@ build("l-close", "Four_women_standing_in_space_202608300005.jpeg",
     [[("Pehle tum.", WHITE)], [("Phir koi aur.", PINK)]], footer_top=1420, is_grid=True, size=68)
 
 build_endcard("m-endcard", "Four_women_standing_in_space_202608300005.jpeg")
+
+# The Story tile shown before it's tapped open -- same frame as the first snap
+# (a-ghosted), re-exported as PNG at Snap's required 3:5 tile ratio (not 9:16 --
+# also discovered live, on the second snap-push-story attempt, after PNG-vs-JPEG
+# was fixed on the first). 1080x1920 at 9:16 -> 1080x1800 at 3:5 needs 120px
+# trimmed off the height; taken mostly off the bottom (20 top / 100 bottom) so
+# her face stays centred and the headline -- which sits at y1420+ -- keeps a
+# wide margin above the new bottom edge at y1820.
+_prev = Image.open(D / "a-ghosted" / "asset-a.jpg").convert("RGB").crop((0, 20, 1080, 1820))
+assert _prev.size == (1080, 1800), _prev.size  # 3:5 exactly, no resize needed
+_prev.save(D / "preview.png")
+print(f"preview.png <- a-ghosted/asset-a.jpg, cropped to {_prev.size} (3:5, Snap's tile ratio)")
