@@ -1,7 +1,7 @@
 ---
 rec_id: rec-2026-08-30-buildyourself-carousel-g-w1830-snap
 network: snap
-status: live
+status: abandoned
 campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
 ad_set_name: WOMEN_18-30_CASUAL_MOVEON-LEAD
 ad_name: IMG_BUILD-YOURSELF-FIRST_G_20260830
@@ -31,6 +31,7 @@ campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-30'
 executed: '2026-08-30'
 last_note: '2026-08-30'
+abandoned: '2026-08-30'
 ---
 
 ## Brief (proposed)
@@ -123,3 +124,8 @@ Full per-slide QA checklist in `qa.md`.
 ## Note — observation (2026-08-30)
 
 ATTRIBUTION, verified not assumed: the shared lead form 1897accc-cd6b-4f60-9269-d76ec149842d was checked live after this push — updated_at is still 2026-08-29T07:51:37.920Z (unchanged) and its default_end_page URL still carries utm_content=VID_MOVE-ON-PROPER_A_20260829, the ad that originally created the form, not this ad and not any of the other 12 in this carousel set (or the BUILD-YOURSELF-FIRST video ad, which reused the same form earlier today). So leads from all 13 carousel ads, the video ad, and MOVE-ON-PROPER itself land on /get/w-apply carrying the SAME utm_content. Ad-level attribution among any of these exists only in Snap's own per-ad delivery reporting (impressions/spend/submissions by ad_id), never in the pocket-dating-coach beacon. The per-ad utm_content this push printed in its plan is what WOULD be on the URL if this ad had created the form — it did not, so don't trust that line, same caveat rec-2026-08-30-buildyourself-lead-w1830-snap already recorded.
+
+## Abandoned
+
+- Date: 2026-08-30
+- Reason: Wrong ad format. Sree's original ask was one Snap carousel ad — a single ad the viewer taps/swipes through image by image (his phrase: 'the images go from one to another when clicking'), which Snap calls a Collection Ad or Story Ad depending on layout. This was built and pushed instead as 13 separate single-image LEAD_GENERATION ads under the standing squad — misreading 'ship these as 13 separate ads under the same squad for now' (Sree's own words, in response to a question this session posed) as the full answer, when what Sree actually meant only became clear once he saw the result and named the real format. All 13 ads were deleted from Snap via DELETE /ads/{id} (confirmed successful, verified 0 remain under the squad beyond the 2 pre-existing ads). Their creative and media objects cannot be deleted through Snap's API at all (no DELETE endpoint exists for /creatives or /media — confirmed against developers.snap.com and by a live 400/E3003 on every attempt) and are permanently orphaned but inert: not attached to any ad, no spend, no delivery, invisible in Ads Manager's ad list. Superseded by a rebuild of this creative as an actual Collection/Story ad, once that formats's requirements are confirmed.

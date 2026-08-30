@@ -1,7 +1,7 @@
 ---
 rec_id: rec-2026-08-30-buildyourself-carousel-m-w1830-snap
 network: snap
-status: live
+status: abandoned
 campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
 ad_set_name: WOMEN_18-30_CASUAL_MOVEON-LEAD
 ad_name: IMG_BUILD-YOURSELF-FIRST_M_20260830
@@ -31,6 +31,7 @@ campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-30'
 executed: '2026-08-30'
 last_note: '2026-08-30'
+abandoned: '2026-08-30'
 ---
 
 ## Brief (proposed)
@@ -127,3 +128,8 @@ ATTRIBUTION, verified not assumed: the shared lead form 1897accc-cd6b-4f60-9269-
 ## Note — observation (2026-08-30)
 
 First push attempt for this ad exceeded the shell's 2-minute wall clock; the ad itself had actually been created (id 173286fa-...) before the timeout. The retry's find_ad-by-name reuse caught this correctly and did not duplicate the ad, but create_lead_creative has no equivalent find-by-name — it created a second, unused LEAD_GENERATION creative object (8bbe6319-bfba-45f7-969c-2ca16fdb874e) pointing at the same image, now orphaned. Harmless (the live ad points at the first creative, not this one; nothing enabled), but noted so it isn't mistaken for a second ad later.
+
+## Abandoned
+
+- Date: 2026-08-30
+- Reason: Wrong ad format. Sree's original ask was one Snap carousel ad — a single ad the viewer taps/swipes through image by image (his phrase: 'the images go from one to another when clicking'), which Snap calls a Collection Ad or Story Ad depending on layout. This was built and pushed instead as 13 separate single-image LEAD_GENERATION ads under the standing squad — misreading 'ship these as 13 separate ads under the same squad for now' (Sree's own words, in response to a question this session posed) as the full answer, when what Sree actually meant only became clear once he saw the result and named the real format. All 13 ads were deleted from Snap via DELETE /ads/{id} (confirmed successful, verified 0 remain under the squad beyond the 2 pre-existing ads). Their creative and media objects cannot be deleted through Snap's API at all (no DELETE endpoint exists for /creatives or /media — confirmed against developers.snap.com and by a live 400/E3003 on every attempt) and are permanently orphaned but inert: not attached to any ad, no spend, no delivery, invisible in Ads Manager's ad list. Superseded by a rebuild of this creative as an actual Collection/Story ad, once that formats's requirements are confirmed.
