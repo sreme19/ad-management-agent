@@ -27,3 +27,12 @@ creatives/_competitor-reference/**/*.mov
 *.wav
 *.m4a
 *.info.json
+
+# Creative production sources (creatives/<slug>/_source/).
+# The frames, clips, audio generations and Flow project exports that fed a finished
+# asset. Kept on disk because Flow and Grok are non-deterministic and none of it can
+# be regenerated — but deliberately NOT committed: it is ~100MB per video creative of
+# binaries git can never shed once taken. The durable record is the README.md in each
+# _source/, which IS tracked and describes what every folder holds.
+creatives/*/_source/*
+!creatives/*/_source/README.md
