@@ -21,24 +21,24 @@ rule on a one-line steer.
 1. **§4 negative list** — checked frame by frame at build time, not assumed from
    the source video passing as a whole. No gowns/luxury signifiers, no giver/
    receiver staging, no back-to-camera reveal (deliberately avoided on
-   `asset-i-world.jpg` — the alternative cliff frame was back-to-camera and was
+   `i-world/asset-a.jpg` — the alternative cliff frame was back-to-camera and was
    not used), no AI artefacts spotted, no one who reads as under 18, no bed
    staging.
 2. **§1 POV rule** — every slide occupies her POV or shows her alone; no woman
-   posed as the object of the frame. `asset-c-alone.jpg` was swapped away from a
+   posed as the object of the frame. `c-alone/asset-a.jpg` was swapped away from a
    frame with a man in sharp, prominent focus (see `brief.md`) specifically to
    hold this line — flagging that trade explicitly rather than letting it pass
    unremarked, since the swapped-out frame is closer to the video's literal Act 1.
-3. **AI-tool watermark** — `asset-g-win.jpg` (the only slide sourced from a Grok
+3. **AI-tool watermark** — `g-win/asset-a.jpg` (the only slide sourced from a Grok
    clip rather than a Flow still) was cropped `693:1232` before upscaling, same
    as the shipped video; checked and clean. The Flow stills used elsewhere don't
    carry a visible sparkle mark in the crops chosen.
-4. **Wordmark** — `asset-m-endcard.jpg`: lowercase `riteangle`, correct spelling,
+4. **Wordmark** — `m-endcard/asset-a.jpg`: lowercase `riteangle`, correct spelling,
    real Gabarito (not Futura — the font wasn't available when the video shipped;
    it is now).
 5. **Legible at Story size** — checked at 216×384 thumbnail as a proxy for
    in-feed size on all 13; type holds on every slide including the two
-   letterboxed group shots (`asset-e-turn.jpg`, `asset-l-close.jpg`) where the
+   letterboxed group shots (`e-turn/asset-a.jpg`, `l-close/asset-a.jpg`) where the
    footer gradient sits below the photo rather than over it.
 6. **Cream or dark** — dark, matching the shipped video's own grade rather than
    `creative-style.md` §5's cream default. Same stated reason as the video: this
@@ -51,7 +51,7 @@ rule on a one-line steer.
 
 ## Deviations recorded, not hidden
 
-1. **`asset-g-win.jpg`'s wardrobe** — jeans, not tennis kit. Same fault already
+1. **`g-win/asset-a.jpg`'s wardrobe** — jeans, not tennis kit. Same fault already
    logged against the shipped video (`buildyourself-lead-w1830/qa.md` deviation
    3), inherited via the same source clip, not introduced here.
 2. **Variant letters A–M name 13 sequential story beats, not an A/B test of one
@@ -59,7 +59,7 @@ rule on a one-line steer.
    "Naming" for why this was used anyway.
 3. **Dark palette, not `creative-style.md` §5's cream default** — see item 6
    above.
-4. **One slide (`asset-c-alone.jpg`) diverges from the shipped video's actual
+4. **One slide (`c-alone/asset-a.jpg`) diverges from the shipped video's actual
    Act 1 beat** to keep a man out of sharp focus — see item 2 above and
    `brief.md`.
 
@@ -67,9 +67,9 @@ rule on a one-line steer.
 
 Re-opened every slide at full resolution rather than trusting the build-time
 checks above. Two examined closely as the most complex layouts (two-line body
-copy, letterboxed group shot): `asset-b-catfish.jpg` and `asset-m-endcard.jpg`.
+copy, letterboxed group shot): `b-catfish/asset-a.jpg` and `m-endcard/asset-a.jpg`.
 Both clean — no found defects beyond what's already logged in "Deviations
-recorded" above (the Apple-logo laptop in `asset-b-catfish.jpg` is the same prop
+recorded" above (the Apple-logo laptop in `b-catfish/asset-a.jpg` is the same prop
 already present, unflagged, in the shipped video, so not treated as new).
 No slide changed as a result of this pass.
 

@@ -103,15 +103,20 @@ def two_tone(dr, lines, top, size, weight="ExtraBold", leading=1.14):
     return y
 
 
-def build(dest, src, lines, footer_top=1300, is_grid=False, size=78, extracted=False):
+def build(subdir, src, lines, footer_top=1300, is_grid=False, size=78, extracted=False):
+    """Each ad is its own creative_ref (rules/naming.md's [VARIANT] token as a
+    folder), because ad-agent snap-push resolves exactly `<creative_ref>/
+    asset-a.jpg` -- one image per creative folder, no per-ad filename param.
+    13 ads sharing one folder was tried first and doesn't fit that contract."""
+    (D / subdir).mkdir(exist_ok=True)
     im = prep_grid(src) if is_grid else (prep_extracted(src) if extracted else prep_plate(src))
     footer_gradient(im, footer_top)
     two_tone(ImageDraw.Draw(im), lines, 1420, size)
-    im.save(D / dest, quality=94, subsampling=0)
-    print(f"{dest} <- {src}")
+    im.save(D / subdir / "asset-a.jpg", quality=94, subsampling=0)
+    print(f"{subdir}/asset-a.jpg <- {src}")
 
 
-def build_endcard(dest, src):
+def build_endcard(subdir, src):
     im = prep_grid(src)
     footer_gradient(im, 900, strength=0.94)
     dark = Image.new("RGB", SIZE, INK)
@@ -125,44 +130,45 @@ def build_endcard(dest, src):
     dr.text((MARGIN, 1280 + int(s1 * 1.2) + int(st * 1.25)), "jab tum taiyaar ho.", font=ft, fill=WHITE)
     fc, _ = fit_lines(dr, "Apply now →", 44, "Bold", max_w)
     dr.text((MARGIN, 1650), "Apply now →", font=fc, fill=PINK)
-    im.save(D / dest, quality=94, subsampling=0)
-    print(f"{dest} <- endcard")
+    (D / subdir).mkdir(exist_ok=True)
+    im.save(D / subdir / "asset-a.jpg", quality=94, subsampling=0)
+    print(f"{subdir}/asset-a.jpg <- endcard")
 
 
-build("asset-a-ghosted.jpg", "Woman_sitting_on_bedroom_floor_202608292351.jpeg",
+build("a-ghosted", "Woman_sitting_on_bedroom_floor_202608292351.jpeg",
     [[("Phir se ", WHITE), ("ghost", PINK), (" kar diya?", WHITE)]])
 
-build("asset-b-catfish.jpg", "Woman_reading_laptop_at_cafe_202608292356.jpeg",
+build("b-catfish", "Woman_reading_laptop_at_cafe_202608292356.jpeg",
     [[("Profile kuch aur, ", WHITE)], [("aadmi ", PINK), ("kuch aur.", WHITE)]], footer_top=1250, size=68)
 
-build("asset-c-alone.jpg", "Woman_sitting_alone_at_table_202608292351.jpeg",
+build("c-alone", "Woman_sitting_alone_at_table_202608292351.jpeg",
     [[("Kab ", WHITE), ("tak?", PINK)]])
 
-build("asset-d-enough.jpg", "Tired_woman_looking_at_phone_202608292351.jpeg",
+build("d-enough", "Tired_woman_looking_at_phone_202608292351.jpeg",
     [[("Bas. ", WHITE), ("Ab nahin.", PINK)]])
 
-build("asset-e-turn.jpg", "Four_women_looking_into_camera_202608300008.jpeg",
+build("e-turn", "Four_women_looking_into_camera_202608300008.jpeg",
     [[("Khud ko ", WHITE), ("bana sakti ho.", PINK)]], footer_top=1420, is_grid=True, size=68)
 
-build("asset-f-strength.jpg", "Woman_completing_heavy_barbell_d…_202608300000.jpeg",
+build("f-strength", "Woman_completing_heavy_barbell_d…_202608300000.jpeg",
     [[("Pehle apni ", WHITE), ("taakat.", PINK)]])
 
-build("asset-g-win.jpg", "tennis-jump-serve-contact.jpg",
+build("g-win", "tennis-jump-serve-contact.jpg",
     [[("Pehle apni ", WHITE), ("jeet.", PINK)]], extracted=True)
 
-build("asset-h-calm.jpg", "Woman_meditating_on_balcony_at_202608300006.jpeg",
+build("h-calm", "Woman_meditating_on_balcony_at_202608300006.jpeg",
     [[("Pehle apna ", WHITE), ("sukoon.", PINK)]])
 
-build("asset-i-world.jpg", "Woman_breathing_at_coastal_overlook_202608300006.jpeg",
+build("i-world", "Woman_breathing_at_coastal_overlook_202608300006.jpeg",
     [[("Pehle apni ", WHITE), ("duniya.", PINK)]])
 
-build("asset-j-joy.jpg", "Woman_laughing_on_rooftop_terrace_202608300005.jpeg",
+build("j-joy", "Woman_laughing_on_rooftop_terrace_202608300005.jpeg",
     [[("Pehle apni ", WHITE), ("khushi.", PINK)]])
 
-build("asset-k-career.jpg", "Woman_smiling_in_modern_office_202608300005.jpeg",
+build("k-career", "Woman_smiling_in_modern_office_202608300005.jpeg",
     [[("Pehle apna ", WHITE), ("career.", PINK)]])
 
-build("asset-l-close.jpg", "Four_women_standing_in_space_202608300005.jpeg",
+build("l-close", "Four_women_standing_in_space_202608300005.jpeg",
     [[("Pehle tum.", WHITE)], [("Phir koi aur.", PINK)]], footer_top=1420, is_grid=True, size=68)
 
-build_endcard("asset-m-endcard.jpg", "Four_women_standing_in_space_202608300005.jpeg")
+build_endcard("m-endcard", "Four_women_standing_in_space_202608300005.jpeg")

@@ -717,9 +717,16 @@ def cmd_snap_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
 
-    video = Path(args.video).expanduser()
-    if not video.exists():
-        print(f"error: video not found at {video}", file=sys.stderr)
+    # Video and image share one path from here on: both go through
+    # create_lead_creative's top_snap_media_id (snap.py's upload_media already
+    # takes IMAGE or VIDEO), and Snap's LEAD_GENERATION creative type doesn't
+    # care which. Added 2026-08-30 alongside the first image use of this command
+    # (BUILD-YOURSELF-FIRST carousel) — video stayed the only path until then
+    # because it was the only path exercised.
+    asset_media_type = "VIDEO" if args.video else "IMAGE"
+    asset = Path(args.video or args.image).expanduser()
+    if not asset.exists():
+        print(f"error: {asset_media_type.lower()} not found at {asset}", file=sys.stderr)
         raise SystemExit(2)
     qa = ledger.root / fm["creative_ref"] / "qa.md"
     if not qa.exists() or "`pass`" not in qa.read_text(encoding="utf-8"):
@@ -754,7 +761,7 @@ def cmd_snap_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
         ("form       ", f'first name + phone + email, privacy={privacy_url}'),
         ("end page   ", (f'{fm["destination_url"]}?<squad-level utms>&ra_src=form '
                          '(no per-lead id — Snap documents no macro)')),
-        ("video      ", str(video)),
+        (f"{asset_media_type.lower():<11}", str(asset)),
         ("targeting  ", targetingspec.describe(spec)),
     ]
     print(f"Plan for {args.rec_id} (everything created PAUSED):")
@@ -819,8 +826,8 @@ def cmd_snap_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
             name=form_name, privacy_url=privacy_url, end_page_url=end_page)
         print(f"form      {form['id']}")
 
-    media = client.upload_media(f'{fm["ad_name"]}_MEDIA', video, media_type="VIDEO")
-    print(f"video     uploaded media_id={media['id']}")
+    media = client.upload_media(f'{fm["ad_name"]}_MEDIA', asset, media_type=asset_media_type)
+    print(f"{asset_media_type.lower():<9} uploaded media_id={media['id']}")
 
     creative = client.create_lead_creative(
         name=f'{fm["ad_name"]}_CREATIVE', media_id=media["id"],
@@ -2132,7 +2139,11 @@ def build_parser() -> argparse.ArgumentParser:
              "PAUSED, then diff it back",
     )
     sp.add_argument("rec_id")
-    sp.add_argument("--video", required=True, help="path to the finished 9:16 video")
+    asset_group = sp.add_mutually_exclusive_group(required=True)
+    asset_group.add_argument("--video", default=None, help="path to the finished 9:16 video")
+    asset_group.add_argument("--image", default=None,
+                             help="path to the finished 9:16 still — added 2026-08-30 for the "
+                             "BUILD-YOURSELF-FIRST carousel, first non-video use of this command")
     sp.add_argument("--headline", default="Apply karo — sirf 18+",
                     help="Snap headline, hard limit 34 chars")
     sp.add_argument("--form-id", default=None,

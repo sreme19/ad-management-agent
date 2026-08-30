@@ -1,3 +1,40 @@
+---
+rec_id: rec-2026-08-30-buildyourself-carousel-b-w1830-snap
+network: snap
+status: live
+campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
+ad_set_name: WOMEN_18-30_CASUAL_MOVEON-LEAD
+ad_name: IMG_BUILD-YOURSELF-FIRST_B_20260830
+campaign_id: 1326aa05-902c-4cec-be92-0a7440ac536d
+ad_set_id: 85c2e782-ea07-4216-8986-f272bdb5d4d7
+ad_id: 99d7ca8b-2b51-4cf9-b881-b34e379401c9
+targeting_summary: "Women 18-30, India pan-India, Android only, expansion off, segment\
+  \ 4673160157025603 excluded \u2014 inherited unchanged from the live ad squad (reused,\
+  \ not created)"
+targeting:
+  gender: FEMALE
+  min_age: '18'
+  max_age: '30'
+  countries:
+  - in
+  os: ANDROID
+  expansion: false
+  regulated_content: true
+creative_ref: creatives/buildyourself-carousel-w1830/b-catfish
+destination_url: https://www.riteangle.dating/get/w-apply
+budget_cap_inr_per_day: 300.0
+duration_days: 5
+from_idea: null
+created: '2026-08-30'
+campaign_daily_cap_inr: 300.0
+campaign_lifetime_cap_inr: null
+campaign_caps_verified: '2026-08-30'
+executed: '2026-08-30'
+last_note: '2026-08-30'
+---
+
+## Brief (proposed)
+
 # BUILD-YOURSELF-FIRST — Snap lead carousel (13 stills)
 
 Re-cuts `creatives/buildyourself-lead-w1830/asset-a.mp4` (the shipped 25.2s video)
@@ -75,3 +112,14 @@ individually, not merely because the source video passed as a whole:
   available on this machine now).
 
 Full per-slide QA checklist in `qa.md`.
+
+## Execution
+
+- Date: 2026-08-30
+- Campaign ID: 1326aa05-902c-4cec-be92-0a7440ac536d
+- Ad set ID: 85c2e782-ea07-4216-8986-f272bdb5d4d7
+- Ad ID: 99d7ca8b-2b51-4cf9-b881-b34e379401c9
+
+## Note — observation (2026-08-30)
+
+ATTRIBUTION, verified not assumed: the shared lead form 1897accc-cd6b-4f60-9269-d76ec149842d was checked live after this push — updated_at is still 2026-08-29T07:51:37.920Z (unchanged) and its default_end_page URL still carries utm_content=VID_MOVE-ON-PROPER_A_20260829, the ad that originally created the form, not this ad and not any of the other 12 in this carousel set (or the BUILD-YOURSELF-FIRST video ad, which reused the same form earlier today). So leads from all 13 carousel ads, the video ad, and MOVE-ON-PROPER itself land on /get/w-apply carrying the SAME utm_content. Ad-level attribution among any of these exists only in Snap's own per-ad delivery reporting (impressions/spend/submissions by ad_id), never in the pocket-dating-coach beacon. The per-ad utm_content this push printed in its plan is what WOULD be on the URL if this ad had created the form — it did not, so don't trust that line, same caveat rec-2026-08-30-buildyourself-lead-w1830-snap already recorded.
