@@ -35,6 +35,10 @@ What fixes it is the frame-into-Grok pipeline, not the character system. Here Me
 on the bedroom floor is the same Meera who lifts her head at the turn, verified
 across Acts 1 and 2.
 
+The frames, the Grok clips, the audio generations and the Flow project export are
+kept in `_source/` — see the README there. None of it is reproducible, so it is the
+only copy of this cast.
+
 Audio is two Flow-generated instrumental beds. Prior practice permits this:
 `moveon-lead-w1830/edit-script.md` says "Meta Sound Collection or Flow-generated
 audio only; a commercial track is a licensing problem on a paid ad."
