@@ -1,13 +1,13 @@
 ---
 rec_id: rec-2026-08-31-moveon-swagger-lead-w1830-snap
 network: snap
-status: proposed
+status: live
 campaign_name: RA_LEADS_GETW-APPLY_IN_PAN_TOF_202608
 ad_set_name: WOMEN_18-30_CASUAL_MOVEON-LEAD
 ad_name: VID_MOVE-ON-PROPER_B_20260831
-campaign_id: null
-ad_set_id: null
-ad_id: null
+campaign_id: 1326aa05-902c-4cec-be92-0a7440ac536d
+ad_set_id: 85c2e782-ea07-4216-8986-f272bdb5d4d7
+ad_id: 0bb15d8b-d9c8-40f8-ad1e-e755c1ece01b
 targeting_summary: 'Women 18-30, pan-India, Android, expansion off as recorded. A
   pure creative swap into the existing women''s Snap lead squad: same campaign, same
   ad squad, same lead form (1897accc, already Google-Sheets-connected 2026-08-30),
@@ -40,6 +40,7 @@ created: '2026-08-31'
 campaign_daily_cap_inr: 300.0
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-31'
+executed: '2026-09-01'
 ---
 
 ## Brief (proposed)
@@ -155,3 +156,11 @@ exactly what the `[VARIANT]` field is for.
 generated person on video. `compliance.md` §6.2 says explicitly that platform
 disclosure rules bind independently and have never been checked. Still unchecked,
 and now on its second ad. Worth closing rather than carrying forward again.
+
+## Execution
+
+- Date: 2026-09-01
+- Campaign ID: 1326aa05-902c-4cec-be92-0a7440ac536d
+- Ad set ID: 85c2e782-ea07-4216-8986-f272bdb5d4d7
+- Ad ID: 0bb15d8b-d9c8-40f8-ad1e-e755c1ece01b
+- Deviated from brief: Enabled 2026-09-01 with three of the brief's four stated conditions unaddressed, so the read is weaker than the brief assumed. (1) EXPANSION STILL ON: squad 85c2e782 reads enable_targeting_expansion=true / SMART_TARGETING, unchanged since 2026-08-31 - see lrn-2026-08-31-snap-forces-expansion-on-lead-squads and q-2026-08-31-does-snap-force-expansion-on-lead-objective. Any male drift in the delivered leads is expected under this setting and must not be blamed on the creative. (2) BUDGET UNCHANGED at Rs 300/day squad under a Rs 300/day campaign cap, so the record's Rs 300 is right but sits below the Rs 800-1200 threshold; VID_BUILD-YOURSELF-FIRST_A_20260830 WAS paused, which is the one condition that was addressed, leaving two active ads (this and VID_MOVE-ON-PROPER_A_20260829) at roughly Rs 150/day each. (3) END TIME STILL 2026-09-03T07:50Z, so the actual window is ~2 days, not the 5 the record states - expect roughly 40 percent of the planned impressions and treat any A/B verdict as directional at best. (4) NO PIXEL on the squad (pixel_id null) - deliberate, not a lapse: snap.py's create_lead_adsquad omits it because LEAD_FORM_SUBMISSIONS converts inside Snap where a pixel cannot see. Note the account's seven older hand-built lead squads all carry pixel 0657d30b because Ads Manager attaches it by default, so this squad is the odd one out by design. Consequence: Snap observes the form submit and nothing after it, so all post-form visibility comes from the page beacon and the Sheets sync, not from Snap's own reporting. Ad review status APPROVED.
