@@ -33,7 +33,7 @@ budget_cap_inr_per_day: 300.0
 duration_days: 5
 from_idea: null
 created: '2026-08-29'
-last_note: '2026-08-29'
+last_note: '2026-08-31'
 campaign_daily_cap_inr: null
 campaign_lifetime_cap_inr: null
 campaign_caps_verified: '2026-08-29'
@@ -340,3 +340,7 @@ Owner override recorded 2026-08-29 in creatives/moveon-lead-w1830/qa.md: the ind
 ## Note — observation (2026-08-29)
 
 CTA corrected 2026-08-29 at the app owner's request: the creative shipped with call_to_action SIGN_UP and was updated in place to APPLY_NOW via PUT, read back and confirmed persisted, ad still PAUSED. snap.py's create_lead_creative default changed to APPLY_NOW so the next push matches the Meta path's Apply framing without a correction.
+
+## Note — incident (2026-08-31)
+
+TARGETING EXPANSION IS ON, CONTRARY TO THIS RECORD. Read live 2026-08-31 off ad squad 85c2e782: enable_targeting_expansion=true with auto_expansion_options.auto_expansion_type=SMART_TARGETING. This record's front matter says expansion: false and its own brief calls that 'the single most load-bearing setting in the build', because expansion is the mechanism by which a submit-optimised objective drifts toward men. The repo did NOT cause this: targeting.to_snap sends the flag explicitly either way (commit a29fe59) and snap_readback_checks verifies it, and auto_expansion_type is a key this repo never sends at all - so Snap set it. Cross-account check the same day: every squad reading SMART_TARGETING is a LEAD_FORM_SUBMISSIONS squad, and the one ACTIVE women's squad that holds expansion=false (WOMEN_18-30_CASUAL_MOVEON-STORY) is a non-lead squad. See lrn-2026-08-31-snap-forces-expansion-on-lead-squads. Consequence for this record's verdict: its W5 result (11F/7M/3 unclear) was produced with expansion ON, so it is evidence that the creative and destination hold up DESPITE expansion, not evidence that expansion-off was what made it work. Do not credit a setting that was not in force.

@@ -18,6 +18,14 @@ Scored against `../_bakeoff/rubric.md`, per `rules/creative-generation.md` §10.
 
 **Verdict: `pass`** — 28.25 / 37.5, with two recorded concerns.
 
+`watermark-check: pass` — 2026-08-31. All eight 1fps frames plus the 2s end card
+were extracted and looked at, and `watermark.scan()` returned peak=0 on every one.
+There is nothing to crop here: Flow's picture is seated as a 1000×975 inset card,
+so the frame's own corners are bare cream and the Flow mark never entered the
+composite. Recorded now because `snap-push-lead` does not enforce the clearance
+gate that `snap-push` and `snap-push-story` do, and the absence of a check is not
+the same as a clean check.
+
 ## Asset
 
 `asset-a.mp4`, 1080×1920, 8.03s, h264 + AAC, 2.4 MB, audio at −14.1 LUFS.

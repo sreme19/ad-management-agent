@@ -1096,7 +1096,28 @@ def cmd_snap_push_lead(args: argparse.Namespace, ledger: Ledger) -> None:
 
     if args.form_id:
         form = {"id": str(args.form_id)}
-        print(f"form      using existing {args.form_id} (its end-page URL is YOURS to verify)")
+        print(f"form      using existing {args.form_id}")
+        # A reused form keeps the end-page URL it was CREATED with — Snap fixes it at
+        # creation and documents no update — so `end_page` computed above is not what
+        # this ad will actually send her to. Printing the computed one would assert an
+        # attribution this push does not have: on 2026-08-31 the reused W18-30 form
+        # still carried utm_content=VID_MOVE-ON-PROPER_A_20260829 while the push
+        # printed _B_20260831. Read the real one back instead of guessing.
+        try:
+            live_form = client.get(f"/lead_generation_forms/{args.form_id}")
+            row = (live_form.get("lead_generation_forms") or [{}])[0]
+            props = ((row.get("lead_generation_form") or row)
+                     .get("default_end_page") or {}).get("end_page_properties") or [{}]
+            actual = props[0].get("url")
+        except (snapapi.SnapError, LookupError, TypeError) as exc:
+            # A reporting nicety must never fail a push that already created objects.
+            actual = None
+            print(f"          (could not read its end page back: {exc})")
+        if actual:
+            end_page = actual
+            if fm["ad_name"] not in actual:
+                print("          NOTE its end page names a DIFFERENT ad — lead-level "
+                      f"attribution for {fm['ad_name']} is absent, by platform limit")
     else:
         form_name = f'RA_LEAD_{fm["ad_set_name"]}_SNAP'
         form = client.find_lead_form(form_name) or client.create_lead_form(

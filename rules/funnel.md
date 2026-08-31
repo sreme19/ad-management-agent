@@ -38,9 +38,9 @@ costs a code change, a change in another repo, or a legal entity** — see
 | rung | option | what it actually costs |
 |---|---|---|
 | 0 | another static image | nothing — the only thing pushable today |
-| 1 | carousel / video | this repo: `snap.py` hardcodes `IMAGE` media, `WEB_VIEW` creative, `REMOTE_WEBPAGE` ad |
+| 1 | carousel / video | **video is built**: `upload_media` takes `IMAGE` or `VIDEO` and every creative path is media-type agnostic. The Snap analogue of a carousel is the **Story ad** — a `COMPOSITE` creative wrapping a tappable sequence of `WEB_VIEW` snaps, paired with `ad_type="STORY"` — built as `ad-agent snap-push-story`. Its children may only be `WEB_VIEW`/`DEEP_LINK`, so **a Story ad cannot carry a lead form**: that combination is still a genuine platform limit, not a code gap |
 | 2 | email capture on `/get/w` | `pocket-dating-coach` route change, plus storage and consent |
-| 3 | on-platform lead form | new objective (`snap.py` hardcodes `TRAFFIC`), new ad type, a lead-form resource `snap.py` has no call for |
+| 3 | on-platform lead form | **built — no longer a code change.** `snap.py` now has `create_lead_campaign` (`LEAD_GENERATION`), `create_lead_adsquad` (`LEAD_FORM_SUBMISSIONS`), `create_lead_form`/`find_lead_form`, `create_lead_creative` and `create_lead_ad`, driven by `ad-agent snap-push-lead`; `upload_media` takes `VIDEO` as well as `IMAGE`. First run 2026-08-29. **The remaining cost is manual, not code:** the form must be connected to a Google Sheet by hand per `rules/lead-delivery.md`, or its leads never arrive |
 | 4 | phone capture | rung 2's cost, and the consumer does not exist — see §3 |
 | 5 | WhatsApp | in neither `networks.yaml` nor `destinations.yaml`; would run on Meta, where `creation: none` and no credential exists |
 
