@@ -42,6 +42,11 @@ These are the actual product rules, and they may have been refined since you las
 - `rules/tracking.md` — the UTM parameters every ad's Website URL must carry, and the pre-/post-launch
   verification checklist. Non-optional: a 2026-08-21 incident lost a full week of Snap spend to
   unattributable installs because this wasn't checked before launch.
+- `rules/lead-delivery.md` — read before any Snap **lead-objective** ad. Snap's API-registered webhook
+  silently never delivers (confirmed 2026-08-30, zero real leads reached `marketing_leads`); the
+  delivery path of record is the native **Google Sheets direct integration**, connected in Ads Manager
+  per form. A lead ad is not "set up" until its form is connected and a test report has landed — this
+  is a manual UI step (`snap-push` cannot build lead forms), so it will never happen on its own.
 
 If the user refines any rule mid-conversation, **edit the rule file itself in the same turn** — don't
 just apply the change once and let it evaporate. The next `ad-audit` run, and the next session, both
@@ -139,6 +144,13 @@ depend on that file being current.
    can follow without re-deriving anything. Include the full UTM string verbatim; note that Meta reads
    `utm_content` as the ad-level id where Snap reads `utm_id` (`rules/networks.yaml`), so don't cross
    the two conventions.
+8b. **Lead-form connection — for Snap lead-objective ads only, before the ad goes live.** Per
+   `rules/lead-delivery.md`: a Snap lead ad's form must be connected to a Riteangle leads Google Sheet
+   (Ads Manager → the ad → Edit → Lead form → Connect form to CRM → Google Sheets → sign in → pick a
+   dedicated per-form sheet → Send test report → confirm the row lands). The API webhook does not
+   deliver, and `snap-push` cannot build lead forms, so this is a manual UI step that must be done and
+   verified explicitly — the ad is not "set up" without it. It is not retroactive: pull any pre-connection
+   backlog by hand (Ads Manager → Download → Account leads, 90-day clock).
 9. **Pre-launch tracking check — before the ad goes live, every time.** Per `rules/tracking.md`: open
    the ad's actual Website URL field and confirm every macro (`utm_term`, `utm_id`, `utm_content`) is
    present and set at the ad level, then click the ad's own preview/swipe-up link and confirm the
