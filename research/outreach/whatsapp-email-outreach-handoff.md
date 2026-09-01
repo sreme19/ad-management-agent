@@ -1,7 +1,59 @@
 # WhatsApp + Email Outreach Campaign — Handoff
 
-Status as of 2026-08-30. Written to be picked up cold in a fresh session (different
+Status as of 2026-08-31. Written to be picked up cold in a fresh session (different
 account/credits) — read this file top to bottom before doing anything else.
+
+> **Latest progress is in the "## Progress log" section below — read it first.** The
+> original plan (steps 1–7) is unchanged, but the email channel now has a live
+> foundation (Brevo) that the plan text below predates.
+
+## Progress log
+
+### 2026-08-31 — Email channel foundation stood up (Brevo)
+
+Tool chosen: **Brevo** (free tier), for three reasons that fit this campaign: free tier
+bills on daily send volume (300/day) not contact count, so a large lead list doesn't
+force a paid plan; a real visual drip/automation builder + KPI dashboard; and **native
+WhatsApp campaigns in the same account**, so the later WhatsApp extension (steps 5/6
+below) becomes turning on a channel we already know rather than integrating a second
+vendor. Driven via Claude-in-Chrome; API preferred for the actual send/sync work.
+
+Architecture decision (locked): **transactional stays on Resend** (`send.riteangle.dating`,
+Amazon SES — unchanged, do not touch). **Marketing/drip runs on Brevo** from a *separate*
+dedicated subdomain so marketing spam-complaint risk never bleeds into the transactional
+domain's reputation.
+
+What's live now:
+- **Brevo account** created (org name "Riteangle", Free plan). Owner login is a
+  Riteangle-controlled address (not analytics@demandlane.com).
+- **Sending subdomain `go.riteangle.dating`** — authenticated **and branded**
+  (DKIM + DMARC both pass). Set up via **NS delegation** (Brevo-managed DNS): two NS
+  records at Porkbun (`go` → `ns1.sendinblue.com`, `go` → `ns2.sendinblue.com`). Because
+  the whole `go.` zone is delegated to Brevo, the branded tracking-link subdomain
+  (`email.go.riteangle.dating`) needed **no extra Porkbun records**. Porkbun is the
+  registrar (DNS on Cloudflare backend); login is Sree's.
+- **Sender** `Riteangle <team@go.riteangle.dating>` — auto-verified (no confirmation
+  email needed since the domain is authenticated; the subdomain can't *receive* mail).
+  The old default sender `chris@wardrobeofamonk.com` (non-compliant, Default DKIM / no
+  DMARC) was **deleted** — all senders now pass the Google/Yahoo/Microsoft bulk rules.
+- **API key** `riteangle-outreach-claude` generated (Active, expires 2027-08-31). Stored
+  as `BREVO_API_KEY` in **`pocket-dating-coach/.env.local`** (gitignored). NOT in
+  ad-management-agent (zero-API by design). Note: Brevo keys also die after 90 days of
+  inactivity; IP restriction left OFF deliberately (Claude Code sessions run from
+  varying IPs).
+
+Carried-forward reminders for the build:
+- **Reply-To** must be set to a monitored inbox on the *root* domain (e.g.
+  `hello@riteangle.dating`, which already receives) on every campaign — `team@go.` sends
+  but cannot receive. This is a per-campaign setting, done at send time.
+- Consent/DPDP note from decision #2 still stands: first email should open with an
+  explicit "you gave us your email when you signed up for early access" reminder + clear
+  unsubscribe, and warm the new subdomain slowly (complaint rate is what kills a fresh
+  sending subdomain).
+
+Not yet done on the email side: no contacts imported, no list built, no drip/automation,
+no templates, no copy, nothing sent. Next up: import the segmented lead list (with the
+reconcile-against-Ads-Manager caveat below), then build the drip + KPI targets.
 
 ## The ask
 
@@ -91,6 +143,10 @@ Goal: reach the female-identified subset of these leads via WhatsApp and email.
 
 ## Not started yet
 
-Everything in the plan above is still pending — no code written, no list pulled, no
-copy drafted, no BSP chosen. This file is the full state; nothing has silently
-progressed further than what's listed here.
+**Done (2026-08-31):** the email-channel *foundation* — see "## Progress log" above
+(Brevo account, `go.riteangle.dating` authenticated+branded, sender, API key).
+
+**Still pending:** everything that uses that foundation — no list pulled, no contacts
+imported, no gender segmentation run, no drip/templates/copy built, nothing sent. On the
+WhatsApp side, no BSP chosen and no infrastructure exists. This file plus the Progress
+log is the full state; nothing has silently progressed further than what's listed here.
